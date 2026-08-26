@@ -1,0 +1,23 @@
+{
+  "name": "unified-chat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first multi-profile communication workspace for WhatsApp and Telegram.",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "electron": "^37.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "electron-vite": "^4.0.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.0.0"
+  }
+}
