@@ -8,7 +8,7 @@ export interface MessagingProvider {
   readonly loginUrl: string
   createView(profile: ProfileRecord, owner: BrowserWindow): Promise<WebContentsView>
   getConversations?(profile: ProfileRecord): Promise<Conversation[]>
-  getMessages?(profile: ProfileRecord, conversationId: string): Promise<Message[]>
+  getMessages?(profile: ProfileRecord, conversationId: string, cursor?: string): Promise<{ messages: Message[]; nextCursor?: string }>
 }
 
 export const providerCatalog: Record<MessagingProvider['id'], Pick<MessagingProvider, 'displayName' | 'loginUrl'>> = {
