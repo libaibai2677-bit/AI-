@@ -73,12 +73,22 @@ export class ProfileManager {
     return record
   }
 
-  async updateStatus(id: string, status: ProfileStatus): Promise<ProfileRecord> {
+  async update(id: string, patch: Partial<Pick<Profile, 'name' | 'status' | 'language' | 'translation' | 'ai' | 'lastConversationId'>>): Promise<ProfileRecord> {
     const record = this.require(id)
-    const updated = { ...record, status, updatedAt: new Date().toISOString() }
+    const updated: ProfileRecord = {
+      ...record,
+      ...patch,
+      translation: patch.translation ? { ...record.translation, ...patch.translation } : record.translation,
+      ai: patch.ai ? { ...record.ai, ...patch.ai } : record.ai,
+      updatedAt: new Date().toISOString(),
+    }
     this.records.set(id, updated)
     await this.persist()
     return updated
+  }
+
+  async updateStatus(id: string, status: ProfileStatus): Promise<ProfileRecord> {
+    return this.update(id, { status })
   }
 
   async remove(id: string): Promise<void> {
