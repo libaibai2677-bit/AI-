@@ -2,12 +2,14 @@ import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import { ProfileManager } from '../../../../packages/profile-core/src/profile-manager'
-import type { CreateProfileInput } from '../../../../packages/profile-core/src/types'
+import type { CreateProfileInput, Profile } from '../../../../packages/profile-core/src/types'
 import { prepareProfileRuntime } from '../../../../packages/profile-core/src/profile-runtime'
 
 let mainWindow: BrowserWindow | null = null
 let profileManager: ProfileManager
 let activeProfileId: string | null = null
+
+type ProfileUpdate = Partial<Pick<Profile, 'name' | 'status' | 'language' | 'translation' | 'ai' | 'lastConversationId'>>
 
 const activeProfilePath = () => path.join(app.getPath('userData'), 'active-profile.json')
 
@@ -90,7 +92,7 @@ app.whenReady().then(async () => {
     await saveActiveProfileId(profileId)
     return runtime
   })
-  ipcMain.handle('profiles:update', async (_event, profileId: string, patch) => profileManager.update(profileId, patch))
+  ipcMain.handle('profiles:update', async (_event, profileId: string, patch: ProfileUpdate) => profileManager.update(profileId, patch))
 
   createWindow()
 
