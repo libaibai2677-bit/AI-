@@ -4,10 +4,11 @@ import type {
   TranslationRequest,
   TranslationResult,
 } from './types'
+import { TranslationCache } from './cache'
 
 export class TranslationRouter {
   private readonly adapters = new Map<TranslationProvider, TranslationProviderAdapter>()
-  private readonly cache = new Map<string, string>()
+  private readonly cache = new TranslationCache()
 
   register(adapter: TranslationProviderAdapter): void {
     this.adapters.set(adapter.name, adapter)
@@ -23,7 +24,9 @@ export class TranslationRouter {
     })
 
     const cached = this.cache.get(cacheKey)
-    if (cached) return { text: cached, provider: preferred, cached: true }
+    if (cached) {
+      return { text: cached.text, provider: cached.provider, cached: true }
+    }
 
     const providers: TranslationProvider[] = preferred === 'deepl'
       ? ['deepl', 'google']
@@ -36,7 +39,7 @@ export class TranslationRouter {
 
       try {
         const text = await adapter.translate(request)
-        this.cache.set(cacheKey, text)
+        this.cache.set(cacheKey, { text, provider, createdAt: Date.now() })
         return { text, provider, cached: false }
       } catch (error) {
         lastError = error
@@ -44,5 +47,13 @@ export class TranslationRouter {
     }
 
     throw new Error(`No translation provider succeeded: ${String(lastError)}`)
+  }
+
+  clearCache(): void {
+    this.cache.clear()
+  }
+
+  cacheSize(): number {
+    return this.cache.size()
   }
 }
