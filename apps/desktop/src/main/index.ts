@@ -1,5 +1,6 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
+import { createProfile, loadProfiles } from './profile-store'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -38,6 +39,8 @@ app.whenReady().then(() => {
   }
 
   ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('profiles:list', () => loadProfiles())
+  ipcMain.handle('profiles:create', (_event, input) => createProfile(input))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
