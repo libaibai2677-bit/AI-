@@ -21,11 +21,15 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Electron desktop shell
 - React renderer
 - Secure preload bridge
+- Typed renderer bridge contract
 - Profile domain model
 - Persistent local Profile Manager
 - Per-Profile isolated data directory
 - Per-Profile Electron persistent session partition
 - Profile quick-switch shortcuts
+- Persisted active Profile selection
+- Persisted last conversation selection
+- Local persisted Profile list for the chat-first UI prototype
 - Quick Lock shortcut and Vault UI
 - Provider-neutral message model
 - Translation Router with cache and DeepL-first / Google-fallback policy
@@ -36,12 +40,11 @@ This document locks the implementation to the agreed Unified Chat product defini
 
 ### Profile Runtime
 
-1. Persist active Profile selection.
-2. Add Profile health checks for session, network, messages, and translation.
-3. Add real Profile open/close lifecycle.
-4. Restore the last conversation for each Profile.
-5. Add safe configuration backup and restore.
-6. Add OS-backed secret storage for provider credentials when needed.
+1. Add Profile health checks for session, network, messages, and translation.
+2. Add real Profile open/close lifecycle.
+3. Restore the last conversation for each Profile in the runtime, not only the renderer prototype.
+4. Add safe configuration backup and restore UI.
+5. Add OS-backed secret storage for provider credentials when needed.
 
 ### Messaging
 
