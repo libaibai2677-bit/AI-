@@ -13,18 +13,45 @@ type Profile = {
   translation: 'DeepL' | 'Google'
 }
 
-const initialProfiles: Profile[] = [
+type Conversation = {
+  id: string
+  name: string
+  profile: string
+  provider: Provider
+  preview: string
+  translated: string
+  unread: boolean
+}
+
+const defaultProfiles: Profile[] = [
   { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', translation: 'DeepL' },
   { id: 'work', name: 'Work', provider: 'WhatsApp', status: 'connected', translation: 'DeepL' },
   { id: 'business', name: 'Business', provider: 'WhatsApp', status: 'attention', translation: 'DeepL' },
   { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', translation: 'Google' },
 ]
 
-const conversations = [
-  { name: 'John', profile: 'Personal', provider: 'WhatsApp', preview: 'Are you free tomorrow?', translated: '明天有空吗？', unread: true },
-  { name: 'Client A', profile: 'Work', provider: 'WhatsApp', preview: 'Can you send me the file?', translated: '你可以把文件发给我吗？', unread: true },
-  { name: 'David', profile: 'Personal', provider: 'Telegram', preview: 'See you later.', translated: '晚点见。', unread: false },
+const conversations: Conversation[] = [
+  { id: 'john', name: 'John', profile: 'Personal', provider: 'WhatsApp', preview: 'Are you free tomorrow?', translated: '明天有空吗？', unread: true },
+  { id: 'client-a', name: 'Client A', profile: 'Work', provider: 'WhatsApp', preview: 'Can you send me the file?', translated: '你可以把文件发给我吗？', unread: true },
+  { id: 'david', name: 'David', profile: 'Personal', provider: 'Telegram', preview: 'See you later.', translated: '晚点见。', unread: false },
 ]
+
+const STORAGE_KEYS = {
+  profiles: 'unified-chat:profiles',
+  activeProfile: 'unified-chat:active-profile',
+  lastConversation: 'unified-chat:last-conversation',
+}
+
+function loadProfiles(): Profile[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.profiles)
+    if (!raw) return defaultProfiles
+    const parsed = JSON.parse(raw) as Profile[]
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultProfiles
+  } catch {
+    return defaultProfiles
+  }
+}
 
 function StatusDot({ status }: { status: Status }) {
   const label = status === 'connected' ? 'Connected' : status === 'attention' ? 'Attention' : status === 'disconnected' ? 'Disconnected' : 'Not configured'
@@ -32,19 +59,34 @@ function StatusDot({ status }: { status: Status }) {
 }
 
 function App() {
-  const [profiles, setProfiles] = useState(initialProfiles)
-  const [activeId, setActiveId] = useState('personal')
+  const [profiles, setProfiles] = useState<Profile[]>(loadProfiles)
+  const [activeId, setActiveId] = useState(() => localStorage.getItem(STORAGE_KEYS.activeProfile) ?? defaultProfiles[0].id)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [locked, setLocked] = useState(false)
   const [search, setSearch] = useState('')
   const [focusMode, setFocusMode] = useState(false)
+  const [selectedConversationId, setSelectedConversationId] = useState(() => localStorage.getItem(STORAGE_KEYS.lastConversation) ?? conversations[0].id)
 
   const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0]
+  const selectedConversation = conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
+
   const visibleConversations = useMemo(() => {
     const query = search.trim().toLowerCase()
     if (!query) return conversations
-    return conversations.filter((conversation) => `${conversation.name} ${conversation.preview} ${conversation.translated}`.toLowerCase().includes(query))
+    return conversations.filter((conversation) => `${conversation.name} ${conversation.preview} ${conversation.translated} ${conversation.profile} ${conversation.provider}`.toLowerCase().includes(query))
   }, [search])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.profiles, JSON.stringify(profiles))
+  }, [profiles])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.activeProfile, activeId)
+  }, [activeId])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.lastConversation, selectedConversationId)
+  }, [selectedConversationId])
 
   useEffect(() => {
     const cleanupLock = window.unifiedChat?.onQuickLock(() => setLocked(true))
@@ -98,6 +140,13 @@ function App() {
                     <small>{profile.provider}</small>
                   </button>
                 ))}
+                <div className="profile-health">
+                  <div className="health-title">{active.provider} · {active.name}</div>
+                  <div><StatusDot status={active.status} /> Session</div>
+                  <div><StatusDot status={active.status === 'connected' ? 'connected' : 'attention'} /> Network</div>
+                  <div><StatusDot status={active.status === 'connected' ? 'connected' : 'attention'} /> Messages</div>
+                  <div><StatusDot status={active.status === 'connected' ? 'connected' : 'attention'} /> Translation</div>
+                </div>
                 <button className="new-profile" onClick={() => setProfiles((items) => [...items, { id: `profile-${items.length + 1}`, name: `Profile ${items.length + 1}`, provider: 'WhatsApp', status: 'not-configured', translation: 'DeepL' }])}>＋ New Profile</button>
               </div>
             )}
@@ -119,7 +168,11 @@ function App() {
           </nav>
           <div className="conversation-list">
             {visibleConversations.map((conversation) => (
-              <button key={`${conversation.provider}-${conversation.name}`} className="conversation">
+              <button
+                key={`${conversation.provider}-${conversation.name}`}
+                className={conversation.id === selectedConversationId ? 'conversation selected' : 'conversation'}
+                onClick={() => setSelectedConversationId(conversation.id)}
+              >
                 <div className="avatar">{conversation.name.slice(0, 1)}</div>
                 <div className="conversation-body">
                   <div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div>
@@ -136,15 +189,15 @@ function App() {
         <section className="chat">
           <div className="chat-header">
             <div>
-              <div className="chat-title">John <span className="online">●</span></div>
-              <div className="chat-subtitle">WhatsApp · Personal · DeepL</div>
+              <div className="chat-title">{selectedConversation.name} <span className="online">●</span></div>
+              <div className="chat-subtitle">{selectedConversation.provider} · {selectedConversation.profile} · {active.translation}</div>
             </div>
             <button className="ghost" onClick={() => setFocusMode((value) => !value)}>{focusMode ? 'Exit Focus' : 'Focus'}</button>
           </div>
           <div className="messages">
             <div className="message incoming">
-              <div className="bubble original">Are you free tomorrow?</div>
-              <div className="bubble translation">明天有空吗？</div>
+              <div className="bubble original">{selectedConversation.preview}</div>
+              <div className="bubble translation">{selectedConversation.translated}</div>
             </div>
             <div className="message outgoing">
               <div className="bubble original">Yeah, probably.</div>
