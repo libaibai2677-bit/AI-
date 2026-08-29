@@ -13,10 +13,10 @@ export type StoredProfile = {
 }
 
 const defaults: StoredProfile[] = [
-  { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese' },
-  { id: 'work', name: 'Work', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese' },
+  { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese', lastConversationId: 'john' },
+  { id: 'work', name: 'Work', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese', lastConversationId: 'client-a' },
   { id: 'business', name: 'Business', provider: 'WhatsApp', status: 'attention', translation: 'DeepL', language: 'Chinese' },
-  { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', translation: 'Google', language: 'Chinese' },
+  { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', translation: 'Google', language: 'Chinese', lastConversationId: 'david' },
 ]
 
 function filePath() {
@@ -48,4 +48,14 @@ export async function createProfile(input: Pick<StoredProfile, 'name' | 'provide
   profiles.push(profile)
   await saveProfiles(profiles)
   return profile
+}
+
+export async function setLastConversation(profileId: string, conversationId: string) {
+  const profiles = await loadProfiles()
+  const index = profiles.findIndex((profile) => profile.id === profileId)
+  if (index < 0) throw new Error('Profile not found')
+
+  profiles[index] = { ...profiles[index], lastConversationId: conversationId }
+  await saveProfiles(profiles)
+  return profiles[index]
 }
