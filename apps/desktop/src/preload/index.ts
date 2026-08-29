@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
   createProfile: (input: ProfileInput) => ipcRenderer.invoke('profiles:create', input),
+  setLastConversation: (profileId: string, conversationId: string) => ipcRenderer.invoke('profiles:set-last-conversation', profileId, conversationId),
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
   onQuickLock: (callback: () => void) => {
