@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
   createProfile: (input: ProfileInput) => ipcRenderer.invoke('profiles:create', input),
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
+  backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
   onQuickLock: (callback: () => void) => {
     const listener = () => callback()
     ipcRenderer.on('profile:quick-lock', listener)
