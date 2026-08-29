@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
 import { createProfile, loadProfiles } from './profile-store'
 import { openProfileWindow } from './profile-window'
@@ -48,6 +48,36 @@ app.whenReady().then(() => {
     if (!profile) throw new Error('Profile not found')
     openProfileWindow(profile)
     return profile
+  })
+  ipcMain.handle('profiles:backup', async (_event, profileId: string) => {
+    const profiles = await loadProfiles()
+    const profile = profiles.find((item) => item.id === profileId)
+    if (!profile) throw new Error('Profile not found')
+
+    const result = await dialog.showSaveDialog(mainWindow ?? undefined, {
+      title: 'Backup Profile',
+      defaultPath: `${profile.name.replace(/[^a-z0-9-_]/gi, '_')}.profile.json`,
+      filters: [{ name: 'Unified Chat Profile', extensions: ['profile.json'] }, { name: 'JSON', extensions: ['json'] }],
+    })
+    if (result.canceled || !result.filePath) return { canceled: true }
+
+    const { writeFile } = await import('node:fs/promises')
+    const payload = {
+      format: 'unified-chat-profile',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profile: {
+        id: profile.id,
+        name: profile.name,
+        provider: profile.provider,
+        translation: profile.translation,
+        language: profile.language,
+        lastConversationId: profile.lastConversationId,
+      },
+      note: 'Session cookies, credentials, tokens and browser storage are intentionally excluded from this backup.',
+    }
+    await writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf8')
+    return { canceled: false, filePath: result.filePath }
   })
 
   app.on('activate', () => {
