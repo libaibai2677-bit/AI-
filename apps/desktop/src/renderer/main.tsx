@@ -62,6 +62,7 @@ function App() {
   const [focusMode, setFocusMode] = useState(false)
   const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false)
   const [loadingProfiles, setLoadingProfiles] = useState(true)
+  const [openingProfileId, setOpeningProfileId] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -103,6 +104,16 @@ function App() {
     }
   }, [profiles])
 
+  const openProfile = async (profile: Profile) => {
+    setActiveId(profile.id)
+    setOpeningProfileId(profile.id)
+    try {
+      await window.unifiedChat?.openProfile(profile.id)
+    } finally {
+      setOpeningProfileId(null)
+    }
+  }
+
   const addProfile = async () => {
     const index = profiles.length + 1
     const input: UnifiedChatProfileInput = {
@@ -117,6 +128,7 @@ function App() {
         setProfiles((items) => [...items, created])
         setActiveId(created.id)
         setView('chats')
+        await openProfile(created)
       }
     } catch {
       // Keep the shell usable if persistence is temporarily unavailable.
@@ -166,7 +178,7 @@ function App() {
               <div className="profile-menu">
                 <div className="menu-title">Profiles</div>
                 {profiles.map((profile) => (
-                  <button key={profile.id} className="profile-option" onClick={() => { setActiveId(profile.id); setProfileMenuOpen(false); setView('chats') }}>
+                  <button key={profile.id} className="profile-option" onClick={() => { void openProfile(profile); setProfileMenuOpen(false); setView('chats') }}>
                     <StatusDot status={profile.status} />
                     <span>{profile.name}</span>
                     <small>{profile.provider}</small>
@@ -211,11 +223,12 @@ function App() {
             <div className="page-heading"><div><h2>Profiles</h2><p>Independent chat workspaces. Browser details stay hidden.</p></div><button className="primary compact" onClick={() => { void addProfile() }}>＋ New Profile</button></div>
             <div className="profile-grid">
               {profiles.map((profile) => (
-                <button key={profile.id} className="profile-card" onClick={() => { setActiveId(profile.id); setView('chats') }}>
+                <button key={profile.id} className="profile-card" onClick={() => { void openProfile(profile) }} disabled={openingProfileId === profile.id}>
                   <div className="profile-card-top"><StatusDot status={profile.status} /><strong>{profile.name}</strong><span>{profile.provider}</span></div>
                   <div className="health-row"><span><StatusDot status={profile.status} /> Session</span><span><StatusDot status={profile.status} /> Messages</span></div>
                   <div className="health-row"><span><StatusDot status={profile.status} /> Network</span><span><StatusDot status={profile.status} /> Translation</span></div>
                   {profile.status === 'attention' && <div className="attention-banner">🟡 Session needs attention</div>}
+                  <div className="profile-open-hint">{openingProfileId === profile.id ? 'Opening…' : 'Open workspace →'}</div>
                 </button>
               ))}
             </div>
