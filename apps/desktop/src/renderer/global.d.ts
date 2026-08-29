@@ -16,6 +16,7 @@ declare global {
       getVersion: () => Promise<string>
       listProfiles: () => Promise<UnifiedChatProfile[]>
       createProfile: (input: UnifiedChatProfileInput) => Promise<UnifiedChatProfile>
+      setLastConversation: (profileId: string, conversationId: string) => Promise<UnifiedChatProfile>
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
       backupProfile: (profileId: string) => Promise<{ canceled: boolean; filePath?: string }>
       onQuickLock: (callback: () => void) => () => void
