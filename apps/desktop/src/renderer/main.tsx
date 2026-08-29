@@ -63,6 +63,7 @@ function App() {
   const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false)
   const [loadingProfiles, setLoadingProfiles] = useState(true)
   const [openingProfileId, setOpeningProfileId] = useState<string | null>(null)
+  const [backupStatus, setBackupStatus] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -111,6 +112,16 @@ function App() {
       await window.unifiedChat?.openProfile(profile.id)
     } finally {
       setOpeningProfileId(null)
+    }
+  }
+
+  const backupProfile = async (profile: Profile) => {
+    setBackupStatus(null)
+    try {
+      const result = await window.unifiedChat?.backupProfile(profile.id)
+      if (result?.filePath) setBackupStatus(`Backup saved: ${result.filePath}`)
+    } catch {
+      setBackupStatus('Backup could not be created.')
     }
   }
 
@@ -220,7 +231,14 @@ function App() {
 
         {view === 'profiles' ? (
           <section className="panel-page">
-            <div className="page-heading"><div><h2>Profiles</h2><p>Independent chat workspaces. Browser details stay hidden.</p></div><button className="primary compact" onClick={() => { void addProfile() }}>＋ New Profile</button></div>
+            <div className="page-heading">
+              <div><h2>Profiles</h2><p>Independent chat workspaces. Browser details stay hidden.</p></div>
+              <div className="page-actions">
+                <button className="ghost compact" onClick={() => { void backupProfile(active) }}>Backup {active.name}</button>
+                <button className="primary compact" onClick={() => { void addProfile() }}>＋ New Profile</button>
+              </div>
+            </div>
+            {backupStatus && <div className="backup-status">✓ {backupStatus}</div>}
             <div className="profile-grid">
               {profiles.map((profile) => (
                 <button key={profile.id} className="profile-card" onClick={() => { void openProfile(profile) }} disabled={openingProfileId === profile.id}>
@@ -241,6 +259,7 @@ function App() {
               <div><strong>Translation Style</strong><span>Natural tone · Natural length</span></div><span className="setting-value">Natural</span>
               <div><strong>Display</strong><span>Show original and translated messages</span></div><span className="setting-value">Bilingual</span>
               <div><strong>Security</strong><span>Quick Lock: Ctrl + Shift + L</span></div><span className="setting-value">Enabled</span>
+              <div><strong>Profile Backup</strong><span>Exports settings only. Credentials and browser storage stay local.</span></div><span className="setting-value">Safe by default</span>
             </div>
           </section>
         ) : (
