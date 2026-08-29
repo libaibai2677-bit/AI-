@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
   createProfile: (input: ProfileInput) => ipcRenderer.invoke('profiles:create', input),
+  openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   onQuickLock: (callback: () => void) => {
     const listener = () => callback()
     ipcRenderer.on('profile:quick-lock', listener)
