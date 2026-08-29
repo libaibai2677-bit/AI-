@@ -7,16 +7,12 @@ type Status = 'connected' | 'attention' | 'disconnected' | 'not-configured'
 type View = 'chats' | 'profiles' | 'search' | 'settings'
 type Filter = 'All' | 'Unread' | 'Mentions' | 'Favorites' | 'Follow Up'
 
-type Profile = {
-  id: string
-  name: string
-  provider: Provider
-  status: Status
-  translation: 'DeepL' | 'Google'
-}
+type Profile = UnifiedChatProfile
 
 type Conversation = {
+  id: string
   name: string
+  profileId: string
   profile: string
   provider: Provider
   preview: string
@@ -27,17 +23,17 @@ type Conversation = {
   followUp: boolean
 }
 
-const initialProfiles: Profile[] = [
-  { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', translation: 'DeepL' },
-  { id: 'work', name: 'Work', provider: 'WhatsApp', status: 'connected', translation: 'DeepL' },
-  { id: 'business', name: 'Business', provider: 'WhatsApp', status: 'attention', translation: 'DeepL' },
-  { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', translation: 'Google' },
+const fallbackProfiles: Profile[] = [
+  { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese' },
+  { id: 'work', name: 'Work', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese' },
+  { id: 'business', name: 'Business', provider: 'WhatsApp', status: 'attention', translation: 'DeepL', language: 'Chinese' },
+  { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', translation: 'Google', language: 'Chinese' },
 ]
 
 const initialConversations: Conversation[] = [
-  { name: 'John', profile: 'Personal', provider: 'WhatsApp', preview: 'Are you free tomorrow?', translated: '明天有空吗？', unread: true, favorite: true, mention: false, followUp: true },
-  { name: 'Client A', profile: 'Work', provider: 'WhatsApp', preview: 'Can you send me the file?', translated: '你可以把文件发给我吗？', unread: true, favorite: false, mention: true, followUp: true },
-  { name: 'David', profile: 'Personal', provider: 'Telegram', preview: 'See you later.', translated: '晚点见。', unread: false, favorite: true, mention: false, followUp: false },
+  { id: 'john', name: 'John', profileId: 'personal', profile: 'Personal', provider: 'WhatsApp', preview: 'Are you free tomorrow?', translated: '明天有空吗？', unread: true, favorite: true, mention: false, followUp: true },
+  { id: 'client-a', name: 'Client A', profileId: 'work', profile: 'Work', provider: 'WhatsApp', preview: 'Can you send me the file?', translated: '你可以把文件发给我吗？', unread: true, favorite: false, mention: true, followUp: true },
+  { id: 'david', name: 'David', profileId: 'telegram', profile: 'Personal', provider: 'Telegram', preview: 'See you later.', translated: '晚点见。', unread: false, favorite: true, mention: false, followUp: false },
 ]
 
 const filterRules: Record<Filter, (conversation: Conversation) => boolean> = {
@@ -54,19 +50,38 @@ function StatusDot({ status }: { status: Status }) {
 }
 
 function App() {
-  const [profiles, setProfiles] = useState(initialProfiles)
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [activeId, setActiveId] = useState('personal')
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [locked, setLocked] = useState(false)
   const [search, setSearch] = useState('')
   const [view, setView] = useState<View>('chats')
   const [filter, setFilter] = useState<Filter>('All')
-  const [selectedConversation, setSelectedConversation] = useState('John')
+  const [selectedConversationId, setSelectedConversationId] = useState('john')
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false)
+  const [loadingProfiles, setLoadingProfiles] = useState(true)
 
-  const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0]
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        const stored = await window.unifiedChat?.listProfiles()
+        if (mounted) setProfiles(stored?.length ? stored : fallbackProfiles)
+      } catch {
+        if (mounted) setProfiles(fallbackProfiles)
+      } finally {
+        if (mounted) setLoadingProfiles(false)
+      }
+    }
+    void load()
+    return () => { mounted = false }
+  }, [])
+
+  const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0] ?? fallbackProfiles[0]
+  const selectedConversation = initialConversations.find((conversation) => conversation.id === selectedConversationId) ?? initialConversations[0]
+
   const visibleConversations = useMemo(() => {
     const query = search.trim().toLowerCase()
     return initialConversations.filter((conversation) => {
@@ -88,9 +103,33 @@ function App() {
     }
   }, [profiles])
 
+  const addProfile = async () => {
+    const index = profiles.length + 1
+    const input: UnifiedChatProfileInput = {
+      name: `Profile ${index}`,
+      provider: 'WhatsApp',
+      translation: 'DeepL',
+      language: 'Chinese',
+    }
+    try {
+      const created = await window.unifiedChat?.createProfile(input)
+      if (created) {
+        setProfiles((items) => [...items, created])
+        setActiveId(created.id)
+        setView('chats')
+      }
+    } catch {
+      // Keep the shell usable if persistence is temporarily unavailable.
+    }
+  }
+
   const switchView = (next: View) => {
     setView(next)
     if (next !== 'search') setSearch('')
+  }
+
+  if (loadingProfiles) {
+    return <main className="vault"><div className="vault-card"><div className="vault-logo">UC</div><h1>Unified Chat</h1><p>Loading Profiles…</p></div></main>
   }
 
   if (locked) {
@@ -133,7 +172,7 @@ function App() {
                     <small>{profile.provider}</small>
                   </button>
                 ))}
-                <button className="new-profile" onClick={() => setProfiles((items) => [...items, { id: `profile-${items.length + 1}`, name: `Profile ${items.length + 1}`, provider: 'WhatsApp', status: 'not-configured', translation: 'DeepL' }])}>＋ New Profile</button>
+                <button className="new-profile" onClick={() => { void addProfile() }}>＋ New Profile</button>
               </div>
             )}
           </div>
@@ -152,7 +191,7 @@ function App() {
           </nav>
           <div className="conversation-list">
             {visibleConversations.map((conversation) => (
-              <button key={`${conversation.provider}-${conversation.name}`} className={selectedConversation === conversation.name ? 'conversation selected' : 'conversation'} onClick={() => { setSelectedConversation(conversation.name); setView('chats') }}>
+              <button key={conversation.id} className={selectedConversationId === conversation.id ? 'conversation selected' : 'conversation'} onClick={() => { setSelectedConversationId(conversation.id); setView('chats') }}>
                 <div className="avatar">{conversation.name.slice(0, 1)}</div>
                 <div className="conversation-body">
                   <div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div>
@@ -169,7 +208,7 @@ function App() {
 
         {view === 'profiles' ? (
           <section className="panel-page">
-            <div className="page-heading"><div><h2>Profiles</h2><p>Independent chat workspaces. Browser details stay hidden.</p></div><button className="primary compact" onClick={() => setProfiles((items) => [...items, { id: `profile-${items.length + 1}`, name: `Profile ${items.length + 1}`, provider: 'WhatsApp', status: 'not-configured', translation: 'DeepL' }])}>＋ New Profile</button></div>
+            <div className="page-heading"><div><h2>Profiles</h2><p>Independent chat workspaces. Browser details stay hidden.</p></div><button className="primary compact" onClick={() => { void addProfile() }}>＋ New Profile</button></div>
             <div className="profile-grid">
               {profiles.map((profile) => (
                 <button key={profile.id} className="profile-card" onClick={() => { setActiveId(profile.id); setView('chats') }}>
@@ -195,8 +234,8 @@ function App() {
           <section className="chat">
             <div className="chat-header">
               <div>
-                <div className="chat-title">{selectedConversation} <span className="online">●</span></div>
-                <div className="chat-subtitle">WhatsApp · Personal · DeepL</div>
+                <div className="chat-title">{selectedConversation.name} <span className="online">●</span></div>
+                <div className="chat-subtitle">{selectedConversation.provider} · {selectedConversation.profile} · {profiles.find((profile) => profile.id === selectedConversation.profileId)?.translation ?? 'DeepL'}</div>
               </div>
               <div className="chat-actions">
                 <button className="ghost" onClick={() => setConversationSettingsOpen((value) => !value)}>Conversation Profile</button>
@@ -205,11 +244,11 @@ function App() {
             </div>
             {conversationSettingsOpen && (
               <div className="conversation-profile">
-                <strong>Conversation Profile</strong><span>English → Chinese</span><span>DeepL</span><span>Natural</span><span>Bilingual</span><span>AI · Casual</span>
+                <strong>Conversation Profile</strong><span>English → Chinese</span><span>{profiles.find((profile) => profile.id === selectedConversation.profileId)?.translation ?? 'DeepL'}</span><span>Natural</span><span>Bilingual</span><span>AI · Casual</span>
               </div>
             )}
             <div className="messages">
-              <div className="message incoming"><div className="bubble original">Are you free tomorrow?</div><div className="bubble translation">明天有空吗？</div></div>
+              <div className="message incoming"><div className="bubble original">{selectedConversation.preview}</div><div className="bubble translation">{selectedConversation.translated}</div></div>
               <div className="message outgoing"><div className="bubble original">Yeah, probably.</div><div className="bubble translation">应该有空。</div></div>
             </div>
             <div className="composer-wrap">
