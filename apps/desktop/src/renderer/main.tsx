@@ -70,7 +70,14 @@ function App() {
     const load = async () => {
       try {
         const stored = await window.unifiedChat?.listProfiles()
-        if (mounted) setProfiles(stored?.length ? stored : fallbackProfiles)
+        if (mounted) {
+          const nextProfiles = stored?.length ? stored : fallbackProfiles
+          setProfiles(nextProfiles)
+          const preferred = nextProfiles.find((profile) => profile.id === activeId) ?? nextProfiles[0]
+          if (preferred?.lastConversationId && initialConversations.some((conversation) => conversation.id === preferred.lastConversationId)) {
+            setSelectedConversationId(preferred.lastConversationId)
+          }
+        }
       } catch {
         if (mounted) setProfiles(fallbackProfiles)
       } finally {
@@ -79,7 +86,7 @@ function App() {
     }
     void load()
     return () => { mounted = false }
-  }, [])
+  }, [activeId])
 
   const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0] ?? fallbackProfiles[0]
   const selectedConversation = initialConversations.find((conversation) => conversation.id === selectedConversationId) ?? initialConversations[0]
@@ -97,7 +104,7 @@ function App() {
     const cleanupLock = window.unifiedChat?.onQuickLock(() => setLocked(true))
     const cleanupSwitch = window.unifiedChat?.onQuickSwitch((index) => {
       const target = profiles[index]
-      if (target) setActiveId(target.id)
+      if (target) void openProfile(target)
     })
     return () => {
       cleanupLock?.()
@@ -107,12 +114,21 @@ function App() {
 
   const openProfile = async (profile: Profile) => {
     setActiveId(profile.id)
+    if (profile.lastConversationId && initialConversations.some((conversation) => conversation.id === profile.lastConversationId)) {
+      setSelectedConversationId(profile.lastConversationId)
+    }
     setOpeningProfileId(profile.id)
     try {
       await window.unifiedChat?.openProfile(profile.id)
     } finally {
       setOpeningProfileId(null)
     }
+  }
+
+  const selectConversation = (conversation: Conversation) => {
+    setSelectedConversationId(conversation.id)
+    setView('chats')
+    void window.unifiedChat?.setLastConversation(conversation.profileId, conversation.id)
   }
 
   const backupProfile = async (profile: Profile) => {
@@ -214,7 +230,7 @@ function App() {
           </nav>
           <div className="conversation-list">
             {visibleConversations.map((conversation) => (
-              <button key={conversation.id} className={selectedConversationId === conversation.id ? 'conversation selected' : 'conversation'} onClick={() => { setSelectedConversationId(conversation.id); setView('chats') }}>
+              <button key={conversation.id} className={selectedConversationId === conversation.id ? 'conversation selected' : 'conversation'} onClick={() => selectConversation(conversation)}>
                 <div className="avatar">{conversation.name.slice(0, 1)}</div>
                 <div className="conversation-body">
                   <div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div>
