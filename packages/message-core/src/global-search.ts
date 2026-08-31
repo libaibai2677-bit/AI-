@@ -1,4 +1,4 @@
-import type { Message } from './types'
+import type { Message } from '../../../messaging/src/types'
 import type { IndexedConversation } from './unified-inbox'
 
 export interface GlobalSearchResult {
@@ -15,30 +15,49 @@ export function searchMessages(
   const needle = query.trim().toLocaleLowerCase()
   if (!needle) return conversations.map(conversation => ({ conversation }))
 
-  const matchedConversationIds = new Set(
+  const matchedConversationKeys = new Set(
     conversations
       .filter(conversation => [
         conversation.title,
         conversation.platform,
         conversation.profileId,
         conversation.lastMessage?.text,
+        conversation.lastMessage?.translatedText,
       ].filter(Boolean).join('\n').toLocaleLowerCase().includes(needle))
-      .map(conversation => conversation.id),
+      .map(conversation => scopedId(conversation.profileId, conversation.id)),
   )
 
   const results: GlobalSearchResult[] = []
+  const matchedMessageKeys = new Set<string>()
+
   for (const conversation of conversations) {
-    if (matchedConversationIds.has(conversation.id)) {
+    const conversationKey = scopedId(conversation.profileId, conversation.id)
+    if (matchedConversationKeys.has(conversationKey)) {
       results.push({ conversation })
       continue
     }
 
     const match = messages
-      .filter(message => message.conversationId === conversation.id)
-      .find(message => message.text.toLocaleLowerCase().includes(needle))
+      .filter(message => scopedId(message.profileId, message.conversationId) === conversationKey)
+      .find(message => [message.text, message.translatedText]
+        .filter(Boolean)
+        .join('\n')
+        .toLocaleLowerCase()
+        .includes(needle))
 
-    if (match) results.push({ conversation, message: match })
+    if (match) {
+      matchedMessageKeys.add(scopedId(match.profileId, match.id))
+      results.push({ conversation, message: match })
+    }
   }
 
-  return results.sort((a, b) => b.conversation.updatedAt.localeCompare(a.conversation.updatedAt))
+  return results.sort((a, b) => {
+    const aTime = a.message?.timestamp ?? a.conversation.updatedAt
+    const bTime = b.message?.timestamp ?? b.conversation.updatedAt
+    return bTime.localeCompare(aTime)
+  })
+}
+
+function scopedId(profileId: string, id: string): string {
+  return `${profileId}:${id}`
 }
