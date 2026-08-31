@@ -11,9 +11,11 @@ import { hasProviderSecret, removeProviderSecret, setProviderSecret } from './se
 import { translateBatch, translateText } from './translation-service'
 import { getConversationProfile, listConversationProfiles, removeConversationProfile, setConversationProfile } from './conversation-profile-store'
 import { configureVault, disableTrustedDevice, enableTrustedDevice, getVaultStatus, lockVault, unlockVault, unlockFromTrustedDevice } from './profile-vault'
+import { aiActionService } from './ai-service'
 import type { ConversationProfile } from '../../../../packages/messaging/src/conversation-profile'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
+import type { AiActionRequest } from '../../../../packages/intelligence/src/ai-actions'
 
 let mainWindow: BrowserWindow | null = null
 let providerSyncLoop: ProviderSyncLoop | null = null
@@ -84,6 +86,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('translation-memory:clear', (_event, profileId: string) => clearDictionary(profileId))
   ipcMain.handle('translation:translate', (_event, request) => translateText(request))
   ipcMain.handle('translation:translate-batch', (_event, requests) => translateBatch(requests))
+  ipcMain.handle('ai:action', (_event, request: AiActionRequest) => aiActionService.execute(request))
 
   providerSyncLoop = new ProviderSyncLoop(() => mainWindow)
   if (!vaultStatus.configured || trustedUnlocked) providerSyncLoop.start()
