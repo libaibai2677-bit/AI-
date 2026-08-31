@@ -21,15 +21,20 @@ export interface TranslationProvider {
   translate(request: TranslationRequest): Promise<string>
 }
 
+export interface TranslationCacheEntry {
+  text: string
+  provider: TranslationProviderId
+}
+
 export interface TranslationCache {
-  get(key: string): Promise<string | undefined>
-  set(key: string, value: string): Promise<void>
+  get(key: string): Promise<TranslationCacheEntry | undefined>
+  set(key: string, value: TranslationCacheEntry): Promise<void>
 }
 
 export class MemoryTranslationCache implements TranslationCache {
-  private readonly values = new Map<string, string>()
+  private readonly values = new Map<string, TranslationCacheEntry>()
   async get(key: string) { return this.values.get(key) }
-  async set(key: string, value: string) { this.values.set(key, value) }
+  async set(key: string, value: TranslationCacheEntry) { this.values.set(key, value) }
 }
 
 export class TranslationRouter {
@@ -41,7 +46,9 @@ export class TranslationRouter {
   async translate(request: TranslationRequest): Promise<TranslationResult> {
     const key = this.cacheKey(request)
     const cached = await this.cache.get(key)
-    if (cached !== undefined) return { text: cached, provider: 'deepl', cached: true }
+    if (cached !== undefined) {
+      return { text: cached.text, provider: cached.provider, cached: true }
+    }
 
     const order: TranslationProviderId[] = ['deepl', 'google']
     let lastError: unknown
@@ -50,7 +57,7 @@ export class TranslationRouter {
       if (!provider) continue
       try {
         const text = await provider.translate(request)
-        await this.cache.set(key, text)
+        await this.cache.set(key, { text, provider: id })
         return { text, provider: id, cached: false }
       } catch (error) {
         lastError = error
