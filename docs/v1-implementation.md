@@ -43,6 +43,9 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Successful provider load restores Profile state to `Connected`
 - Main/preload bridge exposes per-Profile and unified message-state loading
 - Safe Profile configuration restore that never imports session cookies, credentials, tokens, or browser storage
+- Real DeepL HTTP adapter with configurable endpoint
+- Real Google Cloud Translation HTTP adapter
+- Environment-based provider construction without storing API keys in Profile backups
 
 ## Next implementation order
 
@@ -70,8 +73,8 @@ This document locks the implementation to the agreed Unified Chat product defini
 
 - [x] Add router-level provider-native batch contract.
 - [x] Add consecutive-message batching foundation with a short debounce window.
-- [ ] Add real DeepL adapter.
-- [ ] Add real Google adapter.
+- [x] Add real DeepL adapter.
+- [x] Add real Google adapter.
 - [ ] Add language detection.
 - [ ] Add Profile Translation Memory and Personal Dictionary.
 - [x] Add Conversation Profile UI and override model foundation.
