@@ -3,6 +3,8 @@ import { DeepLTranslationProvider, GoogleTranslationProvider } from '../../../..
 import { loadProfiles } from './profile-store'
 import { getProviderSecret } from './secret-store'
 import { PersistentTranslationCache } from './translation-cache-store'
+import { getConversationProfile } from './conversation-profile-store'
+import type { TranslationDefaults } from '../../../../packages/messaging/src/conversation-profile'
 
 export type DesktopTranslationRequest = TranslationRequest
 
@@ -10,6 +12,16 @@ export type DesktopTranslationResult = {
   text: string
   provider: 'deepl' | 'google'
   cached: boolean
+}
+
+const GLOBAL_DEFAULTS: TranslationDefaults = {
+  sourceLanguage: 'auto',
+  targetLanguage: 'Chinese',
+  translationEngine: 'DeepL',
+  tone: 'Natural',
+  length: 'Natural',
+  display: 'Bilingual',
+  aiTone: 'Casual',
 }
 
 async function createRouter(profileId: string) {
@@ -27,14 +39,39 @@ function preferredProvider(translation: 'DeepL' | 'Google'): 'deepl' | 'google' 
   return translation === 'Google' ? 'google' : 'deepl'
 }
 
+function profileDefaults(profile: Awaited<ReturnType<typeof loadProfiles>>[number]): Partial<TranslationDefaults> {
+  return {
+    targetLanguage: profile.language,
+    translationEngine: profile.translation,
+  }
+}
+
+async function resolveRequest(request: DesktopTranslationRequest, profile: Awaited<ReturnType<typeof loadProfiles>>[number]): Promise<DesktopTranslationRequest> {
+  const conversation = request.conversationId
+    ? await getConversationProfile(request.profileId, request.conversationId)
+    : null
+
+  const resolved = {
+    sourceLanguage: conversation?.sourceLanguage ?? GLOBAL_DEFAULTS.sourceLanguage,
+    targetLanguage: conversation?.targetLanguage ?? profileDefaults(profile).targetLanguage ?? GLOBAL_DEFAULTS.targetLanguage,
+    style: (conversation?.tone ?? profileDefaults(profile).tone ?? GLOBAL_DEFAULTS.tone).toLowerCase() as DesktopTranslationRequest['style'],
+    length: (conversation?.length ?? profileDefaults(profile).length ?? GLOBAL_DEFAULTS.length).toLowerCase() as DesktopTranslationRequest['length'],
+  }
+
+  return { ...request, ...resolved }
+}
+
 /** Main-process translation boundary. Provider secrets and HTTP calls never enter the renderer. */
 export async function translateText(request: DesktopTranslationRequest): Promise<DesktopTranslationResult> {
   const profiles = await loadProfiles()
   const profile = profiles.find((item) => item.id === request.profileId)
   if (!profile) throw new Error('Profile not found')
 
+  const effective = await resolveRequest(request, profile)
+  const conversation = effective.conversationId ? await getConversationProfile(effective.profileId, effective.conversationId) : null
+  const engine = conversation?.translationEngine ?? profile.translation
   const router = await createRouter(request.profileId)
-  return router.translate(request, preferredProvider(profile.translation))
+  return router.translate(effective, preferredProvider(engine))
 }
 
 /** Groups requests by Profile so one isolated Profile can use one provider-native batch. */
@@ -53,8 +90,30 @@ export async function translateBatch(requests: DesktopTranslationRequest[]): Pro
   await Promise.all([...groups.entries()].map(async ([profileId, group]) => {
     const profile = profiles.find((item) => item.id === profileId)
     if (!profile) throw new Error(`Profile not found: ${profileId}`)
-    const router = await createRouter(profileId)
-    const translated = await router.translateBatch(group.map((item) => item.request), preferredProvider(profile.translation))
+
+    const effective = await Promise.all(group.map(item => resolveRequest(item.request, profile)))
+    const translated = await (async () => {
+      // A batch is kept provider-consistent per Profile. Conversation-level engine
+      // overrides are split into separate batches so specificity is never lost.
+      const byEngine = new Map<'deepl' | 'google', Array<{ position: number; request: DesktopTranslationRequest }>>()
+      for (let position = 0; position < effective.length; position += 1) {
+        const request = effective[position]
+        const conversation = request.conversationId ? await getConversationProfile(request.profileId, request.conversationId) : null
+        const engine = preferredProvider(conversation?.translationEngine ?? profile.translation)
+        const bucket = byEngine.get(engine) ?? []
+        bucket.push({ position, request })
+        byEngine.set(engine, bucket)
+      }
+
+      const output: Array<DesktopTranslationResult | undefined> = new Array(effective.length)
+      await Promise.all([...byEngine.entries()].map(async ([engine, bucket]) => {
+        const router = await createRouter(profileId)
+        const values = await router.translateBatch(bucket.map(item => item.request), engine)
+        values.forEach((value, i) => { output[bucket[i].position] = value })
+      }))
+      return output as DesktopTranslationResult[]
+    })()
+
     translated.forEach((result, position) => { results[group[position].index] = result })
   }))
 
