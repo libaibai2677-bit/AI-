@@ -11,6 +11,7 @@ type TranslationResult = { text: string; provider: 'deepl' | 'google'; cached: b
 type ConversationProfile = { profileId: string; conversationId: string; sourceLanguage?: string; targetLanguage?: string; translationEngine?: 'DeepL' | 'Google'; tone?: 'Natural' | 'Casual' | 'Professional'; length?: 'Natural' | 'Short' | 'Detailed'; display?: 'Original' | 'Bilingual' | 'Translated'; aiTone?: 'Casual' | 'Business' }
 type TranslationSearchResult = { profileId: string; platform: 'whatsapp' | 'telegram'; conversationId: string; conversationTitle: string; messageId: string; sender: string; text: string; translatedText?: string; timestamp: string; match: 'message' | 'translation' | 'sender' | 'conversation' }
 type VaultStatus = { configured: boolean; trustedDevice: boolean; locked: boolean }
+type InboxUpdate = { type: 'conversation-updated' | 'conversation-removed'; profileId: string; conversationId: string; conversation?: unknown }
 
 contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
@@ -23,8 +24,8 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
   restoreProfile: () => ipcRenderer.invoke('profiles:restore'),
-  lockProfiles: () => ipcRenderer.invoke('profiles:lock') as Promise<boolean>,
-  unlockProfiles: () => ipcRenderer.invoke('profiles:unlock') as Promise<boolean>,
+  lockProfiles: () => ipcRenderer.invoke('profiles:lock'),
+  unlockProfiles: () => ipcRenderer.invoke('profiles:unlock'),
   getVaultStatus: () => ipcRenderer.invoke('profiles:vault:status') as Promise<VaultStatus>,
   configureVault: (password: string) => ipcRenderer.invoke('profiles:vault:configure', password) as Promise<VaultStatus>,
   unlockVault: (password?: string) => ipcRenderer.invoke('profiles:vault:unlock', password) as Promise<boolean>,
@@ -51,6 +52,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   clearTranslationMemory: (profileId: string) => ipcRenderer.invoke('translation-memory:clear', profileId),
   translate: (request: TranslationRequest) => ipcRenderer.invoke('translation:translate', request) as Promise<TranslationResult>,
   translateBatch: (requests: TranslationRequest[]) => ipcRenderer.invoke('translation:translate-batch', requests) as Promise<TranslationResult[]>,
+  onInboxUpdate: (callback: (update: InboxUpdate) => void) => { const listener = (_event: Electron.IpcRendererEvent, update: InboxUpdate) => callback(update); ipcRenderer.on('inbox:updated', listener); return () => ipcRenderer.removeListener('inbox:updated', listener) },
   onQuickLock: (callback: () => void) => { const listener = () => callback(); ipcRenderer.on('profile:quick-lock', listener); return () => ipcRenderer.removeListener('profile:quick-lock', listener) },
   onVaultLockRequired: (callback: () => void) => { const listener = () => callback(); ipcRenderer.on('profile:vault-lock-required', listener); return () => ipcRenderer.removeListener('profile:vault-lock-required', listener) },
   onQuickSwitch: (callback: (index: number) => void) => { const listener = (_event: Electron.IpcRendererEvent, index: number) => callback(index); ipcRenderer.on('profile:quick-switch', listener); return () => ipcRenderer.removeListener('profile:quick-switch', listener) },
