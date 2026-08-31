@@ -28,6 +28,8 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Profile quick-switch shortcuts
 - Quick Lock shortcut and Vault UI
 - Provider-neutral message model
+- Profile-scoped normalized message sync store
+- Cross-Profile inbox aggregation foundation
 - Translation Router with cache and DeepL-first / Google-fallback policy
 - Provider boundary for WhatsApp and Telegram
 - Chat-first UI prototype
@@ -55,7 +57,8 @@ This document locks the implementation to the agreed Unified Chat product defini
 - [x] Open WhatsApp Web and Telegram Web inside the selected Profile runtime.
 - [x] Keep provider session state isolated by Profile.
 - [x] Add provider lifecycle status.
-- [ ] Build the normalized conversation/message synchronization layer.
+- [x] Build the normalized conversation/message synchronization layer foundation.
+- [ ] Connect provider snapshots to persistent local message storage.
 - [ ] Add unified inbox aggregation from live provider data.
 
 ### Translation
