@@ -35,6 +35,14 @@ type UnifiedChatConversation = {
   unreadCount: number
 }
 
+type UnifiedChatIndexedConversation = UnifiedChatConversation & {
+  unreadCount: number
+  mentionCount: number
+  favorite: boolean
+  followUp: boolean
+  updatedAt: string
+}
+
 type UnifiedChatMessageState = {
   version: number
   conversations: UnifiedChatConversation[]
@@ -64,6 +72,7 @@ declare global {
       restoreProfile: () => Promise<{ canceled: boolean; profile?: UnifiedChatProfile }>
       loadMessagesForProfile: (profileId: string) => Promise<{ conversations: UnifiedChatConversation[]; messages: UnifiedChatMessage[] }>
       loadUnifiedMessages: () => Promise<UnifiedChatMessageState>
+      loadUnifiedInbox: () => Promise<UnifiedChatIndexedConversation[]>
       applyProviderSnapshot: (snapshot: UnifiedChatProviderSnapshot) => Promise<UnifiedChatMessageState>
       clearProfileMessages: (profileId: string) => Promise<void>
       onQuickLock: (callback: () => void) => () => void
