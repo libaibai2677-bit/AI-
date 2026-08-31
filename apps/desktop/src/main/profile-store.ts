@@ -9,6 +9,13 @@ export type ProfileHealth = {
   translation: 'connected' | 'attention' | 'disconnected' | 'not-configured'
 }
 
+export type ProfileWindowState = {
+  x?: number
+  y?: number
+  width: number
+  height: number
+}
+
 export type StoredProfile = {
   id: string
   name: string
@@ -18,13 +25,14 @@ export type StoredProfile = {
   translation: 'DeepL' | 'Google'
   language: string
   lastConversationId?: string
+  windowState?: ProfileWindowState
 }
 
 export type ProfileBackup = {
   format: 'unified-chat-profile'
   version: 1
   exportedAt: string
-  profile: Pick<StoredProfile, 'id' | 'name' | 'provider' | 'translation' | 'language' | 'lastConversationId'>
+  profile: Pick<StoredProfile, 'id' | 'name' | 'provider' | 'translation' | 'language' | 'lastConversationId' | 'windowState'>
 }
 
 const defaultHealth = (status: StoredProfile['status']): ProfileHealth => ({
@@ -159,6 +167,16 @@ export async function setLastConversation(profileId: string, conversationId: str
   return profiles[index]
 }
 
+export async function setProfileWindowState(profileId: string, windowState: ProfileWindowState) {
+  const profiles = await loadProfiles()
+  const index = profiles.findIndex((profile) => profile.id === profileId)
+  if (index < 0) throw new Error('Profile not found')
+
+  profiles[index] = { ...profiles[index], windowState }
+  await saveProfiles(profiles)
+  return profiles[index]
+}
+
 export async function restoreProfileConfiguration(backup: ProfileBackup) {
   if (backup.format !== 'unified-chat-profile' || backup.version !== 1) {
     throw new Error('Unsupported Profile backup format')
@@ -178,6 +196,7 @@ export async function restoreProfileConfiguration(backup: ProfileBackup) {
     translation: backup.profile.translation,
     language: backup.profile.language,
     lastConversationId: backup.profile.lastConversationId,
+    windowState: backup.profile.windowState,
     status: existing?.status ?? 'not-configured',
     health: existing?.health ?? defaultHealth('not-configured'),
   }
