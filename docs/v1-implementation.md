@@ -50,6 +50,8 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Environment-based provider construction without storing API keys in Profile backups
 - OS-backed provider secret storage using Electron `safeStorage`
 - Provider secret values remain in the main process and are never readable through the renderer bridge
+- Read-only provider runtime snapshot collector for the rendered WhatsApp/Telegram pages
+- Live profile snapshot IPC and renderer refresh path into the persistent normalized inbox
 
 ## Next implementation order
 
@@ -71,7 +73,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - [x] Add provider lifecycle status.
 - [x] Build the normalized conversation/message synchronization layer foundation.
 - [x] Connect normalized provider snapshots to persistent local message storage.
-- [ ] Add unified inbox aggregation from live provider data.
+- [x] Add unified inbox aggregation from live provider data through a read-only runtime collector.
 
 ### Translation
 
@@ -93,5 +95,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 The application must not add anti-detection, fingerprint randomization, automated challenge solving, or mechanisms intended to bypass platform security or abuse-prevention controls. Isolation is implemented as normal application-level privacy and account separation.
 
 Provider pages are treated as untrusted third-party web content. The Unified Chat application bridge is available only to the local application renderer, never to WhatsApp or Telegram pages.
+
+The live provider collector is read-only: it consumes rendered text/DOM attributes only and does not click, send messages, solve challenges, or inspect cookies/tokens/browser storage.
 
 Provider API secrets are encrypted with the OS-backed Electron `safeStorage` facility. Secret values are write-only from the renderer's perspective; the renderer can query whether a secret exists and remove or replace it, but cannot read the decrypted value.
