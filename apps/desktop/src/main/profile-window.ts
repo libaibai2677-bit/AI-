@@ -3,6 +3,7 @@ import type { WebContents } from 'electron'
 import type { StoredProfile } from './profile-store'
 import { setProfileHealth, setProfileStatus, setProfileWindowState } from './profile-store'
 import { hasProviderSecret } from './secret-store'
+import { loadUnifiedInbox } from './message-store'
 
 const providerUrls = {
   WhatsApp: 'https://web.whatsapp.com/',
@@ -39,6 +40,38 @@ async function refreshTranslationHealth(profile: StoredProfile) {
   await setProfileHealth(profile.id, 'translation', deepl || google ? 'connected' : 'not-configured')
 }
 
+async function restoreLastConversation(window: BrowserWindow, profile: StoredProfile) {
+  if (!profile.lastConversationId || window.isDestroyed()) return
+
+  try {
+    const inbox = await loadUnifiedInbox()
+    const conversation = inbox.find(item => item.profileId === profile.id && item.id === profile.lastConversationId)
+    if (!conversation || window.isDestroyed()) return
+
+    const title = conversation.title || conversation.participant?.displayName
+    if (!title) return
+
+    const escapedTitle = JSON.stringify(title)
+    await window.webContents.executeJavaScript(`
+      (() => {
+        const target = ${escapedTitle}.trim().toLowerCase()
+        if (!target) return false
+        const clean = (value) => (value || '').replace(/\\s+/g, ' ').trim().toLowerCase()
+        const candidates = Array.from(document.querySelectorAll('[role="listitem"], [data-peer-id], [data-testid="cell-frame-container"], .chatlist-chat'))
+        const match = candidates.find((node) => clean(node.getAttribute('aria-label')) === target || clean(node.textContent).includes(target))
+        if (!match) return false
+        const element = match
+        element.scrollIntoView({ block: 'nearest' })
+        element.click()
+        return true
+      })()
+    `, true)
+  } catch {
+    // Provider DOMs are third-party and can change. Failing to restore a
+    // conversation must never prevent the isolated Profile from opening.
+  }
+}
+
 export function openProfileWindow(profile: StoredProfile) {
   const existing = windows.get(profile.id)
   if (existing && !existing.isDestroyed()) {
@@ -48,6 +81,7 @@ export function openProfileWindow(profile: StoredProfile) {
     void setProfileStatus(profile.id, 'connected')
     void setProfileHealth(profile.id, 'network', 'connected')
     void refreshTranslationHealth(profile)
+    void restoreLastConversation(existing, profile)
     return
   }
 
@@ -79,6 +113,7 @@ export function openProfileWindow(profile: StoredProfile) {
   window.webContents.on('did-finish-load', () => {
     if (!hiddenForLock.has(profile.id)) void setProfileStatus(profile.id, 'connected')
     void setProfileHealth(profile.id, 'network', 'connected')
+    void restoreLastConversation(window, profile)
   })
 
   const persistWindowState = () => {
