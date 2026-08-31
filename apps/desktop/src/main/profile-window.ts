@@ -1,7 +1,8 @@
 import { BrowserWindow, screen } from 'electron'
 import type { WebContents } from 'electron'
 import type { StoredProfile } from './profile-store'
-import { setProfileStatus, setProfileWindowState } from './profile-store'
+import { setProfileHealth, setProfileStatus, setProfileWindowState } from './profile-store'
+import { hasProviderSecret } from './secret-store'
 
 const providerUrls = {
   WhatsApp: 'https://web.whatsapp.com/',
@@ -29,12 +30,22 @@ export function getProfileWebContents(profileId: string): WebContents | undefine
   return window.webContents
 }
 
+async function refreshTranslationHealth(profile: StoredProfile) {
+  const [deepl, google] = await Promise.all([
+    hasProviderSecret(profile.id, 'DeepL'),
+    hasProviderSecret(profile.id, 'Google'),
+  ])
+  await setProfileHealth(profile.id, 'translation', deepl || google ? 'connected' : 'not-configured')
+}
+
 export function openProfileWindow(profile: StoredProfile) {
   const existing = windows.get(profile.id)
   if (existing && !existing.isDestroyed()) {
     existing.show()
     existing.focus()
     void setProfileStatus(profile.id, 'connected')
+    void setProfileHealth(profile.id, 'network', 'connected')
+    void refreshTranslationHealth(profile)
     return
   }
 
@@ -55,13 +66,17 @@ export function openProfileWindow(profile: StoredProfile) {
 
   windows.set(profile.id, window)
   void setProfileStatus(profile.id, 'connected')
+  void setProfileHealth(profile.id, 'network', 'connected')
+  void refreshTranslationHealth(profile)
 
   window.webContents.on('did-fail-load', () => {
     void setProfileStatus(profile.id, 'attention')
+    void setProfileHealth(profile.id, 'network', 'attention')
   })
 
   window.webContents.on('did-finish-load', () => {
     void setProfileStatus(profile.id, 'connected')
+    void setProfileHealth(profile.id, 'network', 'connected')
   })
 
   const persistWindowState = () => {
@@ -76,6 +91,8 @@ export function openProfileWindow(profile: StoredProfile) {
     persistWindowState()
     windows.delete(profile.id)
     void setProfileStatus(profile.id, 'disconnected')
+    void setProfileHealth(profile.id, 'network', 'disconnected')
+    void setProfileHealth(profile.id, 'messages', 'disconnected')
   })
 
   void window.loadURL(providerUrls[profile.provider])
@@ -85,6 +102,8 @@ export function closeProfileWindows() {
   for (const [profileId, window] of windows.entries()) {
     if (!window.isDestroyed()) window.close()
     void setProfileStatus(profileId, 'disconnected')
+    void setProfileHealth(profileId, 'network', 'disconnected')
+    void setProfileHealth(profileId, 'messages', 'disconnected')
   }
   windows.clear()
 }
