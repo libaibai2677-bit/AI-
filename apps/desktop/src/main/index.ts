@@ -39,8 +39,9 @@ function createWindow() {
 app.whenReady().then(async () => {
   createWindow()
 
+  const vaultStatus = await getVaultStatus()
   const trustedUnlocked = await unlockFromTrustedDevice()
-  if (!trustedUnlocked && (await getVaultStatus()).configured) {
+  if (!trustedUnlocked && vaultStatus.configured) {
     mainWindow?.webContents.once('did-finish-load', () => mainWindow?.webContents.send('profile:vault-lock-required'))
   }
 
@@ -139,7 +140,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('translation:translate-batch', (_event, requests) => translateBatch(requests))
 
   providerSyncLoop = new ProviderSyncLoop(() => mainWindow)
-  providerSyncLoop.start()
+  if (!vaultStatus.configured || trustedUnlocked) providerSyncLoop.start()
 
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
