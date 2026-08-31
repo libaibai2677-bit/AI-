@@ -1,4 +1,5 @@
 import { BrowserWindow, screen } from 'electron'
+import type { WebContents } from 'electron'
 import type { StoredProfile } from './profile-store'
 import { setProfileStatus, setProfileWindowState } from './profile-store'
 
@@ -20,6 +21,12 @@ function safeBounds(profile: StoredProfile) {
   const x = saved.x === undefined ? undefined : Math.min(Math.max(saved.x, workArea.x), workArea.x + workArea.width - width)
   const y = saved.y === undefined ? undefined : Math.min(Math.max(saved.y, workArea.y), workArea.y + workArea.height - height)
   return { x, y, width, height }
+}
+
+export function getProfileWebContents(profileId: string): WebContents | undefined {
+  const window = windows.get(profileId)
+  if (!window || window.isDestroyed()) return undefined
+  return window.webContents
 }
 
 export function openProfileWindow(profile: StoredProfile) {
