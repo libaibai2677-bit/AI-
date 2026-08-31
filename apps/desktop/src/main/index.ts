@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation, setProfileHealth } from './profile-store'
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
+import { searchUnifiedMessages } from './message-search'
 import { syncOpenProfile } from './provider-runtime-sync'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
 import { hasProviderSecret, removeProviderSecret, setProviderSecret } from './secret-store'
@@ -121,6 +122,7 @@ app.whenReady().then(() => {
   ipcMain.handle('messages:load-profile', (_event, profileId: string) => loadMessagesForProfile(profileId))
   ipcMain.handle('messages:load-unified', () => loadUnifiedMessageState())
   ipcMain.handle('messages:load-inbox', () => loadUnifiedInbox())
+  ipcMain.handle('messages:search', (_event, query: string, limit?: number) => searchUnifiedMessages(query, limit))
   ipcMain.handle('messages:apply-snapshot', (_event, snapshot: ProviderSnapshot) => applyProviderSnapshotPersisted(snapshot))
   ipcMain.handle('messages:sync-profile', (_event, profileId: string) => syncOpenProfile(profileId))
   ipcMain.handle('messages:clear-profile', (_event, profileId: string) => clearPersistedProfileMessages(profileId))
