@@ -34,7 +34,6 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
   restoreProfile: () => ipcRenderer.invoke('profiles:restore'),
   setProviderSecret: (profileId: string, provider: TranslationProvider, value: string) => ipcRenderer.invoke('provider-secret:set', profileId, provider, value) as Promise<void>,
-  getProviderSecret: (profileId: string, provider: TranslationProvider) => ipcRenderer.invoke('provider-secret:get', profileId, provider) as Promise<string | null>,
   hasProviderSecret: (profileId: string, provider: TranslationProvider) => ipcRenderer.invoke('provider-secret:has', profileId, provider) as Promise<boolean>,
   removeProviderSecret: (profileId: string, provider: TranslationProvider) => ipcRenderer.invoke('provider-secret:remove', profileId, provider) as Promise<void>,
   loadMessagesForProfile: (profileId: string) => ipcRenderer.invoke('messages:load-profile', profileId),
