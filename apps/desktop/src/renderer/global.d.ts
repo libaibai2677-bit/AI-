@@ -1,8 +1,17 @@
+type UnifiedChatHealthStatus = 'connected' | 'attention' | 'disconnected' | 'not-configured'
+type UnifiedChatProfileHealth = {
+  session: UnifiedChatHealthStatus
+  network: UnifiedChatHealthStatus
+  messages: UnifiedChatHealthStatus
+  translation: UnifiedChatHealthStatus
+}
+
 type UnifiedChatProfile = {
   id: string
   name: string
   provider: 'WhatsApp' | 'Telegram'
-  status: 'connected' | 'attention' | 'disconnected' | 'not-configured'
+  status: UnifiedChatHealthStatus
+  health: UnifiedChatProfileHealth
   translation: 'DeepL' | 'Google'
   language: string
   lastConversationId?: string
@@ -90,6 +99,7 @@ declare global {
       setActiveProfile: (profileId: string) => Promise<string>
       createProfile: (input: UnifiedChatProfileInput) => Promise<UnifiedChatProfile>
       setLastConversation: (profileId: string, conversationId: string) => Promise<UnifiedChatProfile>
+      setProfileHealth: (profileId: string, component: 'session' | 'network' | 'messages' | 'translation', status: UnifiedChatHealthStatus) => Promise<UnifiedChatProfile>
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
       backupProfile: (profileId: string) => Promise<{ canceled: boolean; filePath?: string }>
       restoreProfile: () => Promise<{ canceled: boolean; profile?: UnifiedChatProfile }>
