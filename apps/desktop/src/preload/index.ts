@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+type AiAction = 'reply' | 'rewrite' | 'explain' | 'summarize' | 'translate'
+type AiConversationContext = { profileId: string; conversationId: string; sourceLanguage: string; targetLanguage: string; tone?: 'casual' | 'natural' | 'professional' | 'business'; messages: Array<{ id: string; role: 'incoming' | 'outgoing'; text: string }> }
+type AiActionResult = { action: AiAction; text: string }
 type ProfileInput = { name: string; provider: 'WhatsApp' | 'Telegram'; translation: 'DeepL' | 'Google'; language: string }
 type ProviderSnapshot = { profileId: string; platform: 'whatsapp' | 'telegram'; conversations: unknown[]; messages: unknown[]; syncedAt: string }
 type ProfileHealthStatus = 'connected' | 'attention' | 'disconnected' | 'not-configured'
@@ -53,6 +56,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   clearTranslationMemory: (profileId: string) => ipcRenderer.invoke('translation-memory:clear', profileId),
   translate: (request: TranslationRequest) => ipcRenderer.invoke('translation:translate', request) as Promise<TranslationResult>,
   translateBatch: (requests: TranslationRequest[]) => ipcRenderer.invoke('translation:translate-batch', requests) as Promise<TranslationResult[]>,
+  executeAiAction: (action: AiAction, input: string, context: AiConversationContext) => ipcRenderer.invoke('ai:action', { action, input, context }) as Promise<AiActionResult>,
   onInboxUpdate: (callback: (update: InboxUpdate) => void) => { const listener = (_event: Electron.IpcRendererEvent, update: InboxUpdate) => callback(update); ipcRenderer.on('inbox:updated', listener); return () => ipcRenderer.removeListener('inbox:updated', listener) },
   onQuickLock: (callback: () => void) => { const listener = () => callback(); ipcRenderer.on('profile:quick-lock', listener); return () => ipcRenderer.removeListener('profile:quick-lock', listener) },
   onVaultLockRequired: (callback: () => void) => { const listener = () => callback(); ipcRenderer.on('profile:vault-lock-required', listener); return () => ipcRenderer.removeListener('profile:vault-lock-required', listener) },
