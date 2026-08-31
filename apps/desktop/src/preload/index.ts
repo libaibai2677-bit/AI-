@@ -7,6 +7,14 @@ type ProfileInput = {
   language: string
 }
 
+type ProviderSnapshot = {
+  profileId: string
+  platform: 'whatsapp' | 'telegram'
+  conversations: unknown[]
+  messages: unknown[]
+  syncedAt: string
+}
+
 contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
@@ -16,6 +24,10 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   setLastConversation: (profileId: string, conversationId: string) => ipcRenderer.invoke('profiles:set-last-conversation', profileId, conversationId),
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
+  loadMessagesForProfile: (profileId: string) => ipcRenderer.invoke('messages:load-profile', profileId),
+  loadUnifiedMessages: () => ipcRenderer.invoke('messages:load-unified'),
+  applyProviderSnapshot: (snapshot: ProviderSnapshot) => ipcRenderer.invoke('messages:apply-snapshot', snapshot),
+  clearProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:clear-profile', profileId),
   onQuickLock: (callback: () => void) => {
     const listener = () => callback()
     ipcRenderer.on('profile:quick-lock', listener)
