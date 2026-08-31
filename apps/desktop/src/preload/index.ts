@@ -15,6 +15,12 @@ type ProviderSnapshot = {
   syncedAt: string
 }
 
+type DictionaryEntry = {
+  source: string
+  target: string
+  note?: string
+}
+
 contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
@@ -30,6 +36,10 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   loadUnifiedInbox: () => ipcRenderer.invoke('messages:load-inbox'),
   applyProviderSnapshot: (snapshot: ProviderSnapshot) => ipcRenderer.invoke('messages:apply-snapshot', snapshot),
   clearProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:clear-profile', profileId),
+  listTranslationMemory: (profileId: string) => ipcRenderer.invoke('translation-memory:list', profileId),
+  setTranslationMemoryEntry: (profileId: string, entry: DictionaryEntry) => ipcRenderer.invoke('translation-memory:set', profileId, entry),
+  removeTranslationMemoryEntry: (profileId: string, source: string) => ipcRenderer.invoke('translation-memory:remove', profileId, source),
+  clearTranslationMemory: (profileId: string) => ipcRenderer.invoke('translation-memory:clear', profileId),
   onQuickLock: (callback: () => void) => {
     const listener = () => callback()
     ipcRenderer.on('profile:quick-lock', listener)
