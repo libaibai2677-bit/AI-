@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
-import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation, setProfileHealth } from './profile-store'
+import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation, setProfileHealth, setProfileStatus } from './profile-store'
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
@@ -73,9 +73,9 @@ app.whenReady().then(() => {
     if (result.canceled || !result.filePath) return { canceled: true }
 
     const { writeFile } = await import('node:fs/promises')
-    const payload = {
-      format: 'unified-chat-profile' as const,
-      version: 1 as const,
+    const payload: ProfileBackup = {
+      format: 'unified-chat-profile',
+      version: 1,
       exportedAt: new Date().toISOString(),
       profile: {
         id: profile.id,
@@ -84,8 +84,8 @@ app.whenReady().then(() => {
         translation: profile.translation,
         language: profile.language,
         lastConversationId: profile.lastConversationId,
+        windowState: profile.windowState,
       },
-      note: 'Session cookies, credentials, tokens and browser storage are intentionally excluded from this backup.',
     }
     await writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf8')
     return { canceled: false, filePath: result.filePath }
