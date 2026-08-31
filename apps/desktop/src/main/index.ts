@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
 import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation } from './profile-store'
 import { openProfileWindow } from './profile-window'
-import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedMessageState } from './message-store'
+import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
 
@@ -102,6 +102,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('messages:load-profile', (_event, profileId: string) => loadMessagesForProfile(profileId))
   ipcMain.handle('messages:load-unified', () => loadUnifiedMessageState())
+  ipcMain.handle('messages:load-inbox', () => loadUnifiedInbox())
   ipcMain.handle('messages:apply-snapshot', (_event, snapshot: ProviderSnapshot) => applyProviderSnapshotPersisted(snapshot))
   ipcMain.handle('messages:clear-profile', (_event, profileId: string) => clearPersistedProfileMessages(profileId))
 
