@@ -53,6 +53,18 @@ type ConversationProfile = {
   aiTone?: 'Casual' | 'Business'
 }
 
+type TranslationSearchResult = {
+  profileId: string
+  platform: 'whatsapp' | 'telegram'
+  conversationId: string
+  conversationTitle: string
+  messageId: string
+  sender: string
+  text: string
+  translatedText?: string
+  timestamp: string
+}
+
 contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
@@ -74,6 +86,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   loadMessagesForProfile: (profileId: string) => ipcRenderer.invoke('messages:load-profile', profileId),
   loadUnifiedMessages: () => ipcRenderer.invoke('messages:load-unified'),
   loadUnifiedInbox: () => ipcRenderer.invoke('messages:load-inbox'),
+  searchMessages: (query: string, limit?: number) => ipcRenderer.invoke('messages:search', query, limit) as Promise<TranslationSearchResult[]>,
   syncProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:sync-profile', profileId),
   applyProviderSnapshot: (snapshot: ProviderSnapshot) => ipcRenderer.invoke('messages:apply-snapshot', snapshot),
   clearProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:clear-profile', profileId),
