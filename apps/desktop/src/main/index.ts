@@ -4,7 +4,7 @@ import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfigu
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
-import { getProviderSecret, hasProviderSecret, removeProviderSecret, setProviderSecret } from './secret-store'
+import { hasProviderSecret, removeProviderSecret, setProviderSecret } from './secret-store'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
 
@@ -102,8 +102,9 @@ app.whenReady().then(() => {
     return { canceled: false, profile }
   })
 
+  // Secret values never cross the renderer boundary on reads. The main process
+  // owns encrypted storage; the UI only needs set / presence / remove operations.
   ipcMain.handle('provider-secret:set', (_event, profileId: string, provider: 'DeepL' | 'Google', value: string) => setProviderSecret(profileId, provider, value))
-  ipcMain.handle('provider-secret:get', (_event, profileId: string, provider: 'DeepL' | 'Google') => getProviderSecret(profileId, provider))
   ipcMain.handle('provider-secret:has', (_event, profileId: string, provider: 'DeepL' | 'Google') => hasProviderSecret(profileId, provider))
   ipcMain.handle('provider-secret:remove', (_event, profileId: string, provider: 'DeepL' | 'Google') => removeProviderSecret(profileId, provider))
 
