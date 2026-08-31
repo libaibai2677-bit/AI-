@@ -29,6 +29,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Quick Lock shortcut and Vault UI
 - Provider-neutral message model
 - Profile-scoped normalized message sync store
+- Persistent local normalized message store with Profile-scoped upsert/clear
 - Cross-Profile inbox aggregation foundation
 - Translation Router with cache and DeepL-first / Google-fallback policy
 - Router-level provider-native batch contract
@@ -40,6 +41,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Provider load failure changes Profile state to `Attention`
 - Provider window close changes Profile state to `Disconnected`
 - Successful provider load restores Profile state to `Connected`
+- Main/preload bridge exposes per-Profile and unified message-state loading
 
 ## Next implementation order
 
@@ -60,7 +62,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - [x] Keep provider session state isolated by Profile.
 - [x] Add provider lifecycle status.
 - [x] Build the normalized conversation/message synchronization layer foundation.
-- [ ] Connect provider snapshots to persistent local message storage.
+- [x] Connect normalized provider snapshots to persistent local message storage.
 - [ ] Add unified inbox aggregation from live provider data.
 
 ### Translation
