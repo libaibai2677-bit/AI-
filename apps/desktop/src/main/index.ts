@@ -5,6 +5,7 @@ import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
 import { hasProviderSecret, removeProviderSecret, setProviderSecret } from './secret-store'
+import { translateBatch, translateText } from './translation-service'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
 
@@ -118,6 +119,10 @@ app.whenReady().then(() => {
   ipcMain.handle('translation-memory:set', (_event, profileId: string, entry) => setDictionaryEntry(profileId, entry))
   ipcMain.handle('translation-memory:remove', (_event, profileId: string, source: string) => removeDictionaryEntry(profileId, source))
   ipcMain.handle('translation-memory:clear', (_event, profileId: string) => clearDictionary(profileId))
+
+  // Translation is main-process only: API keys stay in OS-backed secret storage.
+  ipcMain.handle('translation:translate', (_event, request) => translateText(request))
+  ipcMain.handle('translation:translate-batch', (_event, requests) => translateBatch(requests))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
