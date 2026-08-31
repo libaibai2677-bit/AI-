@@ -5,6 +5,7 @@ import { lockProfileWindows, openProfileWindow, unlockProfileWindows } from './p
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { searchUnifiedMessages } from './message-search'
 import { syncOpenProfile } from './provider-runtime-sync'
+import { ProviderSyncLoop } from './provider-sync-loop'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
 import { hasProviderSecret, removeProviderSecret, setProviderSecret } from './secret-store'
 import { translateBatch, translateText } from './translation-service'
@@ -15,6 +16,7 @@ import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
 
 let mainWindow: BrowserWindow | null = null
+let providerSyncLoop: ProviderSyncLoop | null = null
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -45,6 +47,7 @@ app.whenReady().then(async () => {
   globalShortcut.register('CommandOrControl+Shift+L', async () => {
     if (await lockVault()) {
       lockProfileWindows()
+      providerSyncLoop?.stop()
       mainWindow?.webContents.send('profile:quick-lock')
     }
   })
@@ -94,12 +97,18 @@ app.whenReady().then(async () => {
   ipcMain.handle('profiles:vault:configure', (_event, password: string) => configureVault(password))
   ipcMain.handle('profiles:vault:unlock', async (_event, password?: string) => {
     const success = password ? await unlockVault(password) : await unlockFromTrustedDevice()
-    if (success) unlockProfileWindows()
+    if (success) {
+      unlockProfileWindows()
+      providerSyncLoop?.start()
+    }
     return success
   })
   ipcMain.handle('profiles:vault:lock', async () => {
     const success = await lockVault()
-    if (success) lockProfileWindows()
+    if (success) {
+      lockProfileWindows()
+      providerSyncLoop?.stop()
+    }
     return success
   })
   ipcMain.handle('profiles:vault:trusted-enable', (_event, password: string) => enableTrustedDevice(password))
@@ -129,8 +138,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('translation:translate', (_event, request) => translateText(request))
   ipcMain.handle('translation:translate-batch', (_event, requests) => translateBatch(requests))
 
+  providerSyncLoop = new ProviderSyncLoop(() => mainWindow)
+  providerSyncLoop.start()
+
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
-app.on('will-quit', () => { globalShortcut.unregisterAll() })
+app.on('will-quit', () => {
+  providerSyncLoop?.stop()
+  globalShortcut.unregisterAll()
+})
