@@ -76,6 +76,8 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
   restoreProfile: () => ipcRenderer.invoke('profiles:restore'),
+  lockProfiles: () => ipcRenderer.invoke('profiles:lock') as Promise<boolean>,
+  unlockProfiles: () => ipcRenderer.invoke('profiles:unlock') as Promise<boolean>,
   getConversationProfile: (profileId: string, conversationId: string) => ipcRenderer.invoke('conversation-profile:get', profileId, conversationId) as Promise<ConversationProfile | null>,
   listConversationProfiles: (profileId: string) => ipcRenderer.invoke('conversation-profile:list', profileId) as Promise<ConversationProfile[]>,
   setConversationProfile: (profile: ConversationProfile) => ipcRenderer.invoke('conversation-profile:set', profile) as Promise<ConversationProfile>,
