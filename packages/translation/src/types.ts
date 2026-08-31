@@ -18,4 +18,6 @@ export interface TranslationResult {
 export interface TranslationProviderAdapter {
   readonly name: TranslationProvider
   translate(request: TranslationRequest): Promise<string>
+  /** Optional provider-native batching. Implementations should preserve input order. */
+  translateBatch?(requests: TranslationRequest[]): Promise<string[]>
 }
