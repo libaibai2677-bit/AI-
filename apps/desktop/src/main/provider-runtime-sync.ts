@@ -73,12 +73,33 @@ async function collectRuntimeSnapshot(webContents: WebContents, platform: Messag
  */
 function readProviderDom(platform: MessagePlatform): RuntimeSnapshot {
   const clean = (value: string | null | undefined) => (value ?? '').replace(/\s+/g, ' ').trim()
+  const parseTimestamp = (node: Element, fallback: string) => {
+    const candidates = [
+      node.getAttribute('data-timestamp'),
+      node.getAttribute('data-time'),
+      node.getAttribute('datetime'),
+      node.querySelector('time')?.getAttribute('datetime'),
+    ]
+    for (const value of candidates) {
+      if (!value) continue
+      const parsed = Date.parse(value)
+      if (!Number.isNaN(parsed)) return new Date(parsed).toISOString()
+      if (/^\d{10,13}$/.test(value)) {
+        const numeric = Number(value)
+        const millis = value.length === 10 ? numeric * 1000 : numeric
+        const date = new Date(millis)
+        if (!Number.isNaN(date.getTime())) return date.toISOString()
+      }
+    }
+    return fallback
+  }
   const hash = (value: string) => {
     let h = 2166136261
     for (let i = 0; i < value.length; i += 1) h = Math.imul(h ^ value.charCodeAt(i), 16777619)
     return `dom-${(h >>> 0).toString(16)}`
   }
 
+  const now = new Date().toISOString()
   const conversationSelectors = platform === 'whatsapp'
     ? ['[role="listitem"]', 'div[data-testid="cell-frame-container"]']
     : ['[data-peer-id]', '.chatlist-chat', '[role="listitem"]']
@@ -94,7 +115,7 @@ function readProviderDom(platform: MessagePlatform): RuntimeSnapshot {
     if (seen.has(id)) continue
     seen.add(id)
     const preview = clean(el.querySelector('[data-testid*="last-msg"], .message, .dialog-subtitle, [dir="auto"]')?.textContent)
-    conversations.push({ id, title, preview })
+    conversations.push({ id, title, preview, timestamp: parseTimestamp(el, now) })
     if (conversations.length >= 100) break
   }
 
@@ -114,7 +135,13 @@ function readProviderDom(platform: MessagePlatform): RuntimeSnapshot {
     if (!text || text.length > 4000) continue
     const sender = clean(el.querySelector('[data-pre-plain-text]')?.getAttribute('data-pre-plain-text')) || 'Unknown'
     const id = clean(el.getAttribute('data-id')) || clean(el.getAttribute('data-mid')) || hash(`${activeConversationId}:${sender}:${text}`)
-    messages.push({ id, conversationId: activeConversationId, sender, text, timestamp: new Date().toISOString() })
+    messages.push({
+      id,
+      conversationId: activeConversationId,
+      sender,
+      text,
+      timestamp: parseTimestamp(el, now),
+    })
   }
 
   return { conversations, messages }
