@@ -127,6 +127,8 @@ declare global {
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
       backupProfile: (profileId: string) => Promise<{ canceled: boolean; filePath?: string }>
       restoreProfile: () => Promise<{ canceled: boolean; profile?: UnifiedChatProfile }>
+      lockProfiles: () => Promise<boolean>
+      unlockProfiles: () => Promise<boolean>
       getConversationProfile: (profileId: string, conversationId: string) => Promise<UnifiedChatConversationProfile | null>
       listConversationProfiles: (profileId: string) => Promise<UnifiedChatConversationProfile[]>
       setConversationProfile: (profile: UnifiedChatConversationProfile) => Promise<UnifiedChatConversationProfile>
