@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
+import { translateMessage, type TranslateMessage, type TranslationUiState } from './translation-controller'
 
 type Provider = 'WhatsApp' | 'Telegram'
 type Status = 'connected' | 'attention' | 'disconnected' | 'not-configured'
@@ -8,158 +9,37 @@ type View = 'chats' | 'profiles' | 'search' | 'settings'
 type Filter = 'All' | 'Unread' | 'Mentions' | 'Favorites' | 'Follow Up'
 type Profile = UnifiedChatProfile
 type Conversation = { id: string; name: string; profileId: string; profile: string; provider: Provider; preview: string; translated: string; unread: boolean; favorite: boolean; mention: boolean; followUp: boolean; timestamp: string }
-type Message = { id: string; profileId: string; conversationId: string; platform: 'whatsapp' | 'telegram'; sender: { id: string; displayName: string }; text: string; translatedText?: string; timestamp: string; unread: boolean; mentioned: boolean; favorite: boolean; followUp: boolean }
+type Message = TranslateMessage & { platform: 'whatsapp' | 'telegram'; sender: { id: string; displayName: string }; unread: boolean; mentioned: boolean; favorite: boolean; followUp: boolean }
 type InboxUpdate = { type: 'conversation-updated' | 'conversation-removed'; profileId: string; conversationId: string; conversation?: any }
-
 const fallbackProfiles: Profile[] = [
   { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', health: { session: 'connected', network: 'connected', messages: 'connected', translation: 'connected' }, translation: 'DeepL', language: 'Chinese' },
   { id: 'work', name: 'Work', provider: 'WhatsApp', status: 'connected', health: { session: 'connected', network: 'connected', messages: 'connected', translation: 'connected' }, translation: 'DeepL', language: 'Chinese' },
   { id: 'business', name: 'Business', provider: 'WhatsApp', status: 'attention', health: { session: 'attention', network: 'connected', messages: 'attention', translation: 'connected' }, translation: 'DeepL', language: 'Chinese' },
   { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', health: { session: 'connected', network: 'connected', messages: 'connected', translation: 'connected' }, translation: 'Google', language: 'Chinese' },
 ]
-
 const fallbackConversations: Conversation[] = [
   { id: 'john', name: 'John', profileId: 'personal', profile: 'Personal', provider: 'WhatsApp', preview: 'Are you free tomorrow?', translated: '明天有空吗？', unread: true, favorite: true, mention: false, followUp: true, timestamp: '2026-08-31T08:00:00.000Z' },
   { id: 'client-a', name: 'Client A', profileId: 'work', profile: 'Work', provider: 'WhatsApp', preview: 'Can you send me the file?', translated: '你可以把文件发给我吗？', unread: true, favorite: false, mention: true, followUp: true, timestamp: '2026-08-31T07:30:00.000Z' },
   { id: 'david', name: 'David', profileId: 'telegram', profile: 'Personal', provider: 'Telegram', preview: 'See you later.', translated: '晚点见。', unread: false, favorite: true, mention: false, followUp: false, timestamp: '2026-08-30T12:00:00.000Z' },
 ]
-
-function toConversation(item: any, profiles: Profile[]): Conversation {
-  const profile = profiles.find((candidate) => candidate.id === item.profileId)
-  const message = item.lastMessage
-  return { id: item.id, name: item.title || item.participant?.displayName || 'Unknown', profileId: item.profileId, profile: profile?.name ?? item.profileId, provider: item.platform === 'whatsapp' ? 'WhatsApp' : 'Telegram', preview: message?.text ?? '', translated: message?.translatedText ?? '', unread: item.unreadCount > 0, favorite: Boolean(item.favorite), mention: item.mentionCount > 0, followUp: Boolean(item.followUp), timestamp: item.updatedAt }
-}
-
-function formatMessageTime(timestamp: string) {
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
+function toConversation(item: any, profiles: Profile[]): Conversation { const profile = profiles.find((candidate) => candidate.id === item.profileId); const message = item.lastMessage; return { id: item.id, name: item.title || item.participant?.displayName || 'Unknown', profileId: item.profileId, profile: profile?.name ?? item.profileId, provider: item.platform === 'whatsapp' ? 'WhatsApp' : 'Telegram', preview: message?.text ?? '', translated: message?.translatedText ?? '', unread: item.unreadCount > 0, favorite: Boolean(item.favorite), mention: item.mentionCount > 0, followUp: Boolean(item.followUp), timestamp: item.updatedAt } }
+function formatMessageTime(timestamp: string) { const date = new Date(timestamp); return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
 function App() {
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [conversations, setConversations] = useState<Conversation[]>(fallbackConversations)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [activeId, setActiveId] = useState('personal')
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
-  const [locked, setLocked] = useState(false)
-  const [search, setSearch] = useState('')
-  const [view, setView] = useState<View>('chats')
-  const [filter, setFilter] = useState<Filter>('All')
-  const [selectedConversationKey, setSelectedConversationKey] = useState('personal:john')
-  const [loadingProfiles, setLoadingProfiles] = useState(true)
-  const [dataSource, setDataSource] = useState<'local' | 'demo'>('demo')
-
-  const refreshInbox = async (nextProfiles: Profile[] = profiles) => {
-    const inbox = await window.unifiedChat?.loadUnifiedInbox()
-    if (!inbox?.length) return false
-    setConversations(inbox.map((item: any) => toConversation(item, nextProfiles)))
-    setDataSource('local')
-    return true
-  }
-
-  useEffect(() => {
-    let mounted = true
-    const load = async () => {
-      try {
-        const storedProfiles = await window.unifiedChat?.listProfiles()
-        const nextProfiles = storedProfiles?.length ? storedProfiles : fallbackProfiles
-        if (!mounted) return
-        setProfiles(nextProfiles)
-        const active = (await window.unifiedChat?.getActiveProfileId()) ?? nextProfiles[0]?.id ?? 'personal'
-        setActiveId(nextProfiles.some((profile) => profile.id === active) ? active : nextProfiles[0]?.id ?? 'personal')
-        const inbox = await window.unifiedChat?.loadUnifiedInbox()
-        if (mounted && inbox?.length) {
-          const nextConversations = inbox.map((item: any) => toConversation(item, nextProfiles))
-          setConversations(nextConversations)
-          setDataSource('local')
-          const preferredProfile = nextProfiles.find((profile) => profile.id === active)
-          const preferred = preferredProfile?.lastConversationId ? nextConversations.find((conversation) => conversation.profileId === preferredProfile.id && conversation.id === preferredProfile.lastConversationId) : undefined
-          const first = preferred ?? nextConversations[0]
-          if (first) setSelectedConversationKey(`${first.profileId}:${first.id}`)
-        }
-      } catch { if (mounted) { setProfiles(fallbackProfiles); setDataSource('demo') } }
-      finally { if (mounted) setLoadingProfiles(false) }
-    }
-    void load()
-    return () => { mounted = false }
-  }, [])
-
-  useEffect(() => {
-    let mounted = true
-    const loadMessages = async () => {
-      if (!selectedConversationKey || dataSource !== 'local') return
-      const separator = selectedConversationKey.indexOf(':')
-      if (separator < 0) return
-      const profileId = selectedConversationKey.slice(0, separator)
-      const conversationId = selectedConversationKey.slice(separator + 1)
-      try {
-        const result = await window.unifiedChat?.loadMessagesForProfile(profileId)
-        if (!mounted) return
-        const next = (result?.messages ?? []) as Message[]
-        setMessages(next.filter((message) => message.conversationId === conversationId).sort((a, b) => a.timestamp.localeCompare(b.timestamp)))
-      } catch { if (mounted) setMessages([]) }
-    }
-    void loadMessages()
-    return () => { mounted = false }
-  }, [selectedConversationKey, dataSource])
-
-  useEffect(() => {
-    const cleanupInbox = window.unifiedChat?.onInboxUpdate((update: InboxUpdate) => {
-      if (locked) return
-      setConversations((current) => {
-        if (update.type === 'conversation-removed') return current.filter((item) => !(item.profileId === update.profileId && item.id === update.conversationId))
-        if (!update.conversation) return current
-        const next = toConversation(update.conversation, profiles)
-        const without = current.filter((item) => !(item.profileId === next.profileId && item.id === next.id))
-        return [next, ...without]
-      })
-      if (update.type === 'conversation-updated' && update.conversation) {
-        const message = update.conversation.lastMessage as Message | undefined
-        if (message) setMessages((current) => {
-          const without = current.filter((item) => item.id !== message.id)
-          return [...without, message].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-        })
-      }
-      if (update.type === 'conversation-removed') {
-        setMessages((current) => current.filter((message) => !(message.profileId === update.profileId && message.conversationId === update.conversationId)))
-      }
-      setDataSource('local')
-    })
-    return () => cleanupInbox?.()
-  }, [profiles, locked])
-
-  useEffect(() => {
-    const cleanupLock = window.unifiedChat?.onQuickLock(() => setLocked(true))
-    return () => cleanupLock?.()
-  }, [])
-
-  const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0] ?? fallbackProfiles[0]
-  const selectedConversation = conversations.find((conversation) => `${conversation.profileId}:${conversation.id}` === selectedConversationKey) ?? conversations[0]
-  const selectedMessages = useMemo(() => selectedConversation ? messages.filter((message) => message.profileId === selectedConversation.profileId && message.conversationId === selectedConversation.id) : [], [messages, selectedConversation])
-  const visibleConversations = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return conversations.filter((conversation) => {
-      const matchesFilter = filter === 'All' || (filter === 'Unread' ? conversation.unread : filter === 'Mentions' ? conversation.mention : filter === 'Favorites' ? conversation.favorite : conversation.followUp)
-      const matchesProfile = activeId ? conversation.profileId === activeId : true
-      const matchesSearch = !query || `${conversation.name} ${conversation.profile} ${conversation.provider} ${conversation.preview} ${conversation.translated}`.toLowerCase().includes(query)
-      return matchesFilter && matchesProfile && matchesSearch
-    }).sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-  }, [conversations, filter, search, activeId])
-
-  const selectConversation = (conversation: Conversation) => { setSelectedConversationKey(`${conversation.profileId}:${conversation.id}`); setActiveId(conversation.profileId); setView('chats'); void window.unifiedChat?.setLastConversation(conversation.profileId, conversation.id) }
-  const openProfile = async (profile: Profile) => { setActiveId(profile.id); const last = conversations.find((item) => item.profileId === profile.id && item.id === profile.lastConversationId); if (last) setSelectedConversationKey(`${last.profileId}:${last.id}`); setProfileMenuOpen(false); await window.unifiedChat?.openProfile(profile.id); await refreshInbox(profiles) }
+  const [profiles, setProfiles] = useState<Profile[]>([]); const [conversations, setConversations] = useState<Conversation[]>(fallbackConversations); const [messages, setMessages] = useState<Message[]>([]); const [activeId, setActiveId] = useState('personal'); const [profileMenuOpen, setProfileMenuOpen] = useState(false); const [locked, setLocked] = useState(false); const [search, setSearch] = useState(''); const [view, setView] = useState<View>('chats'); const [filter, setFilter] = useState<Filter>('All'); const [selectedConversationKey, setSelectedConversationKey] = useState('personal:john'); const [translationState, setTranslationState] = useState<TranslationUiState>({ status: 'idle' }); const [loadingProfiles, setLoadingProfiles] = useState(true); const [dataSource, setDataSource] = useState<'local' | 'demo'>('demo')
+  const refreshInbox = async (nextProfiles: Profile[] = profiles) => { const inbox = await window.unifiedChat?.loadUnifiedInbox(); if (!inbox?.length) return false; setConversations(inbox.map((item: any) => toConversation(item, nextProfiles))); setDataSource('local'); return true }
+  useEffect(() => { let mounted = true; const load = async () => { try { const storedProfiles = await window.unifiedChat?.listProfiles(); const nextProfiles = storedProfiles?.length ? storedProfiles : fallbackProfiles; if (!mounted) return; setProfiles(nextProfiles); const active = (await window.unifiedChat?.getActiveProfileId()) ?? nextProfiles[0]?.id ?? 'personal'; const resolvedActive = nextProfiles.some((profile) => profile.id === active) ? active : nextProfiles[0]?.id ?? 'personal'; setActiveId(resolvedActive); const inbox = await window.unifiedChat?.loadUnifiedInbox(); if (mounted && inbox?.length) { const next = inbox.map((item: any) => toConversation(item, nextProfiles)); setConversations(next); setDataSource('local'); const preferredProfile = nextProfiles.find((profile) => profile.id === resolvedActive); const preferred = preferredProfile?.lastConversationId ? next.find((conversation) => conversation.profileId === preferredProfile.id && conversation.id === preferredProfile.lastConversationId) : undefined; const first = preferred ?? next[0]; if (first) setSelectedConversationKey(`${first.profileId}:${first.id}`) } } catch { if (mounted) { setProfiles(fallbackProfiles); setDataSource('demo') } } finally { if (mounted) setLoadingProfiles(false) } }; void load(); return () => { mounted = false } }, [])
+  useEffect(() => { let mounted = true; const loadMessages = async () => { if (!selectedConversationKey || dataSource !== 'local') return; const separator = selectedConversationKey.indexOf(':'); if (separator < 0) return; const profileId = selectedConversationKey.slice(0, separator); const conversationId = selectedConversationKey.slice(separator + 1); try { const result = await window.unifiedChat?.loadMessagesForProfile(profileId); if (!mounted) return; const next = ((result?.messages ?? []) as Message[]).filter((message) => message.conversationId === conversationId).sort((a, b) => a.timestamp.localeCompare(b.timestamp)); setMessages(next) } catch { if (mounted) setMessages([]) } }; void loadMessages(); return () => { mounted = false } }, [selectedConversationKey, dataSource])
+  useEffect(() => { const cleanup = window.unifiedChat?.onInboxUpdate((update: InboxUpdate) => { if (locked) return; setConversations((current) => { if (update.type === 'conversation-removed') return current.filter((item) => !(item.profileId === update.profileId && item.id === update.conversationId)); if (!update.conversation) return current; const next = toConversation(update.conversation, profiles); const without = current.filter((item) => !(item.profileId === next.profileId && item.id === next.id)); return [next, ...without] }); if (update.type === 'conversation-updated' && update.conversation) { const message = update.conversation.lastMessage as Message | undefined; if (message && message.profileId === activeId && message.conversationId === selectedConversationKey.slice(selectedConversationKey.indexOf(':') + 1)) setMessages((current) => [...current.filter((item) => item.id !== message.id), message].sort((a, b) => a.timestamp.localeCompare(b.timestamp))) } if (update.type === 'conversation-removed') setMessages((current) => current.filter((message) => !(message.profileId === update.profileId && message.conversationId === update.conversationId))); setDataSource('local') }); return () => cleanup?.() }, [profiles, locked, activeId, selectedConversationKey])
+  useEffect(() => { const cleanup = window.unifiedChat?.onQuickLock(() => setLocked(true)); return () => cleanup?.() }, [])
+  const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0] ?? fallbackProfiles[0]; const selectedConversation = conversations.find((conversation) => `${conversation.profileId}:${conversation.id}` === selectedConversationKey) ?? conversations[0]; const selectedMessages = useMemo(() => selectedConversation ? messages.filter((message) => message.profileId === selectedConversation.profileId && message.conversationId === selectedConversation.id) : [], [messages, selectedConversation])
+  const visibleConversations = useMemo(() => { const query = search.trim().toLowerCase(); return conversations.filter((conversation) => { const matchesFilter = filter === 'All' || (filter === 'Unread' ? conversation.unread : filter === 'Mentions' ? conversation.mention : filter === 'Favorites' ? conversation.favorite : conversation.followUp); const matchesProfile = activeId ? conversation.profileId === activeId : true; const matchesSearch = !query || `${conversation.name} ${conversation.profile} ${conversation.provider} ${conversation.preview} ${conversation.translated}`.toLowerCase().includes(query); return matchesFilter && matchesProfile && matchesSearch }).sort((a, b) => b.timestamp.localeCompare(a.timestamp)) }, [conversations, filter, search, activeId])
+  const selectConversation = (conversation: Conversation) => { setSelectedConversationKey(`${conversation.profileId}:${conversation.id}`); setActiveId(conversation.profileId); setView('chats'); setTranslationState({ status: 'idle' }); void window.unifiedChat?.setLastConversation(conversation.profileId, conversation.id) }
+  const openProfile = async (profile: Profile) => { setActiveId(profile.id); const last = conversations.find((item) => item.profileId === profile.id && item.id === profile.lastConversationId) ?? conversations.find((item) => item.profileId === profile.id); if (last) setSelectedConversationKey(`${last.profileId}:${last.id}`); setProfileMenuOpen(false); await window.unifiedChat?.openProfile(profile.id); await refreshInbox(profiles) }
+  const translateOne = async (message: Message) => { setTranslationState({ status: 'translating', messageId: message.id }); try { const result = await translateMessage(message, active.language, message.profileId, (profileId, messageId, translatedText) => window.unifiedChat?.updateMessageTranslation(profileId, messageId, translatedText)); setMessages((current) => current.map((item) => item.id === message.id ? { ...item, translatedText: result.translatedText } : item)); setTranslationState({ status: 'translated', messageId: message.id, cached: result.cached, provider: result.provider }) } catch (error) { setTranslationState({ status: 'error', messageId: message.id, error: error instanceof Error ? error.message : 'Translation failed' }) } }
   const switchView = (next: View) => { setView(next); if (next !== 'search') setSearch('') }
-
   if (loadingProfiles) return <main className="vault"><div className="vault-card"><h1>Unified Chat</h1><p>Loading Profiles…</p></div></main>
   if (locked) return <main className="vault"><div className="vault-card"><h1>Unified Chat</h1><p>🔐 Profile Vault</p><button className="primary" onClick={() => setLocked(false)}>Unlock</button></div></main>
-
-  return <main className="app">
-    <header className="topbar"><div className="brand-group"><button className="icon-button" aria-label="Menu">☰</button><button className="brand brand-button" onClick={() => switchView('chats')}>Unified Chat</button><label className="search"><span>⌕</span><input value={search} onChange={(event) => { setSearch(event.target.value); setView('search') }} placeholder="Search everywhere..." /></label></div><div className="top-actions"><div className="profile-switch-wrap"><button className="profile-switch" onClick={() => setProfileMenuOpen((open) => !open)}><StatusDot status={active.status} /> {active.name} <span className="provider-label">{active.provider}</span> ▾</button>{profileMenuOpen && <div className="profile-menu"><div className="menu-title">Profiles</div>{profiles.map((profile) => <button key={profile.id} className="profile-option" onClick={() => void openProfile(profile)}><StatusDot status={profile.status} /><span>{profile.name}</span><small>{profile.provider}</small></button>)}</div>}</div><button className="icon-button" aria-label="Lock" onClick={() => setLocked(true)}>🔒</button></div></header>
-    <section className="workspace"><aside className="sidebar"><div className="section-title">Chats</div><nav className="filters">{(['All', 'Unread', 'Mentions', 'Favorites', 'Follow Up'] as Filter[]).map((item) => <button key={item} className={filter === item ? 'active' : ''} onClick={() => { setFilter(item); setView('chats') }}>{item}</button>)}</nav><div className="conversation-list">{visibleConversations.map((conversation) => <button key={`${conversation.profileId}:${conversation.id}`} className={selectedConversationKey === `${conversation.profileId}:${conversation.id}` ? 'conversation selected' : 'conversation'} onClick={() => selectConversation(conversation)}><div className="avatar">{conversation.name.slice(0, 1)}</div><div className="conversation-body"><div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div><div className="conversation-meta">{conversation.provider} · {conversation.profile}</div><div className="preview">{conversation.preview || 'No messages yet.'}</div></div></button>)}</div><button className="profiles-link" onClick={() => switchView('profiles')}>◉ Profiles</button><button className="profiles-link" onClick={() => switchView('settings')}>⚙ Settings</button></aside><section className="chat"><div className="chat-header"><div><div className="chat-title">{selectedConversation?.name ?? 'No conversation'} <span className="online">●</span></div><div className="chat-subtitle">{selectedConversation ? `${selectedConversation.provider} · ${selectedConversation.profile}` : 'Select a conversation'}</div></div></div>{selectedConversation ? <div className="messages">{selectedMessages.length ? selectedMessages.map((message) => <div key={message.id} className={`message-row ${message.sender.id === selectedConversation.id ? 'outgoing' : 'incoming'}`}><div className="bubble"><div className="message-sender">{message.sender.displayName}</div><div>{message.text}</div>{message.translatedText && <div className="translation">{message.translatedText}</div>}<time>{formatMessageTime(message.timestamp)}</time></div></div>) : <div className="message-row incoming"><div className="bubble"><div>{selectedConversation.preview}</div>{selectedConversation.translated && <div className="translation">{selectedConversation.translated}</div>}<time>{formatMessageTime(selectedConversation.timestamp)}</time></div></div>}<div className="composer"><span>📎</span><input placeholder="Type a message..." /><button>🌐</button><button>✨</button><button>➤</button></div></div> : <div className="empty-chat">Select a conversation</div>}</section></section>
-  </main>
+  return <main className="app"><header className="topbar"><div className="brand-group"><button className="icon-button" aria-label="Menu">☰</button><button className="brand brand-button" onClick={() => switchView('chats')}>Unified Chat</button><label className="search"><span>⌕</span><input value={search} onChange={(event) => { setSearch(event.target.value); setView('search') }} placeholder="Search everywhere..." /></label></div><div className="top-actions"><div className="profile-switch-wrap"><button className="profile-switch" onClick={() => setProfileMenuOpen((open) => !open)}><StatusDot status={active.status} /> {active.name} <span className="provider-label">{active.provider}</span> ▾</button>{profileMenuOpen && <div className="profile-menu"><div className="menu-title">Profiles</div>{profiles.map((profile) => <button key={profile.id} className="profile-option" onClick={() => void openProfile(profile)}><StatusDot status={profile.status} /><span>{profile.name}</span><small>{profile.provider}</small></button>)}</div>}</div><button className="icon-button" aria-label="Lock" onClick={() => setLocked(true)}>🔒</button></div></header><section className="workspace"><aside className="sidebar"><div className="section-title">Chats</div><nav className="filters">{(['All', 'Unread', 'Mentions', 'Favorites', 'Follow Up'] as Filter[]).map((item) => <button key={item} className={filter === item ? 'active' : ''} onClick={() => { setFilter(item); setView('chats') }}>{item}</button>)}</nav><div className="conversation-list">{visibleConversations.map((conversation) => <button key={`${conversation.profileId}:${conversation.id}`} className={selectedConversationKey === `${conversation.profileId}:${conversation.id}` ? 'conversation selected' : 'conversation'} onClick={() => selectConversation(conversation)}><div className="avatar">{conversation.name.slice(0, 1)}</div><div className="conversation-body"><div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div><div className="conversation-meta">{conversation.provider} · {conversation.profile}</div><div className="preview">{conversation.preview || 'No messages yet.'}</div></div></button>)}</div><button className="profiles-link" onClick={() => switchView('profiles')}>◉ Profiles</button><button className="profiles-link" onClick={() => switchView('settings')}>⚙ Settings</button></aside><section className="chat"><div className="chat-header"><div><div className="chat-title">{selectedConversation?.name ?? 'No conversation'} <span className="online">●</span></div><div className="chat-subtitle">{selectedConversation ? `${selectedConversation.provider} · ${selectedConversation.profile}` : 'Select a conversation'}</div></div></div>{selectedConversation ? <div className="messages">{selectedMessages.length ? selectedMessages.map((message) => { const isTranslating = translationState.status === 'translating' && translationState.messageId === message.id; const hasError = translationState.status === 'error' && translationState.messageId === message.id; const isTranslated = translationState.status === 'translated' && translationState.messageId === message.id; return <div key={message.id} className={`message-row ${message.sender.id === selectedConversation.id ? 'outgoing' : 'incoming'}`}><div className="bubble"><div className="message-sender">{message.sender.displayName}</div><div>{message.text}</div>{message.translatedText && <div className="translation">{message.translatedText}</div>}<div className="message-actions"><time>{formatMessageTime(message.timestamp)}</time>{!message.translatedText && <button className="translate-button" onClick={() => void translateOne(message)} disabled={isTranslating}>🌐 {isTranslating ? 'Translating…' : 'Translate'}</button>}{isTranslated && <small>{translationState.cached ? 'Cached' : translationState.provider}</small>}{hasError && <button onClick={() => void translateOne(message)}>Retry</button>}</div></div></div> }) : <div className="message-row incoming"><div className="bubble"><div>{selectedConversation.preview}</div>{selectedConversation.translated && <div className="translation">{selectedConversation.translated}</div>}<time>{formatMessageTime(selectedConversation.timestamp)}</time></div></div>}<div className="composer"><span>📎</span><input placeholder="Type a message..." /><button>🌐</button><button>✨</button><button>➤</button></div></div> : <div className="empty-chat">Select a conversation</div>}</section></section></main>
 }
-
 function StatusDot({ status }: { status: Status }) { return <span className={`status ${status}`} aria-label={status} /> }
-
 createRoot(document.getElementById('root')!).render(<App />)
