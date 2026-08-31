@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   restoreProfile: () => ipcRenderer.invoke('profiles:restore'),
   loadMessagesForProfile: (profileId: string) => ipcRenderer.invoke('messages:load-profile', profileId),
   loadUnifiedMessages: () => ipcRenderer.invoke('messages:load-unified'),
+  loadUnifiedInbox: () => ipcRenderer.invoke('messages:load-inbox'),
   applyProviderSnapshot: (snapshot: ProviderSnapshot) => ipcRenderer.invoke('messages:apply-snapshot', snapshot),
   clearProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:clear-profile', profileId),
   onQuickLock: (callback: () => void) => {
