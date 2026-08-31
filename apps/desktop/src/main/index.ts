@@ -1,12 +1,14 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
-import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation, setProfileHealth, setProfileStatus } from './profile-store'
+import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation, setProfileHealth } from './profile-store'
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { syncOpenProfile } from './provider-runtime-sync'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
 import { hasProviderSecret, removeProviderSecret, setProviderSecret } from './secret-store'
 import { translateBatch, translateText } from './translation-service'
+import { getConversationProfile, listConversationProfiles, removeConversationProfile, setConversationProfile } from './conversation-profile-store'
+import type { ConversationProfile } from '../../../../packages/messaging/src/conversation-profile'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
 
@@ -104,6 +106,11 @@ app.whenReady().then(() => {
     const profile = await restoreProfileConfiguration(backup)
     return { canceled: false, profile }
   })
+
+  ipcMain.handle('conversation-profile:get', (_event, profileId: string, conversationId: string) => getConversationProfile(profileId, conversationId))
+  ipcMain.handle('conversation-profile:list', (_event, profileId: string) => listConversationProfiles(profileId))
+  ipcMain.handle('conversation-profile:set', (_event, profile: ConversationProfile) => setConversationProfile(profile))
+  ipcMain.handle('conversation-profile:remove', (_event, profileId: string, conversationId: string) => removeConversationProfile(profileId, conversationId))
 
   // Secret values never cross the renderer boundary on reads. The main process
   // owns encrypted storage; the UI only needs set / presence / remove operations.
