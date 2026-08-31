@@ -63,6 +63,7 @@ type TranslationSearchResult = {
   text: string
   translatedText?: string
   timestamp: string
+  match: 'message' | 'translation' | 'sender' | 'conversation'
 }
 
 contextBridge.exposeInMainWorld('unifiedChat', {
