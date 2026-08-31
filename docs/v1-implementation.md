@@ -21,6 +21,8 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Electron desktop shell
 - React renderer
 - Secure preload bridge
+- Provider windows do **not** receive the application preload bridge
+- Provider windows run with context isolation, Node integration disabled, and sandbox enabled
 - Profile domain model
 - Persistent local Profile Manager
 - Per-Profile isolated data directory
@@ -87,3 +89,5 @@ This document locks the implementation to the agreed Unified Chat product defini
 ## Security boundary
 
 The application must not add anti-detection, fingerprint randomization, automated challenge solving, or mechanisms intended to bypass platform security or abuse-prevention controls. Isolation is implemented as normal application-level privacy and account separation.
+
+Provider pages are treated as untrusted third-party web content. The Unified Chat application bridge is available only to the local application renderer, never to WhatsApp or Telegram pages.
