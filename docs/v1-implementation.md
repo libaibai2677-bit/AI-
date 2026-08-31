@@ -48,6 +48,8 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Real DeepL HTTP adapter with configurable endpoint
 - Real Google Cloud Translation HTTP adapter
 - Environment-based provider construction without storing API keys in Profile backups
+- OS-backed provider secret storage using Electron `safeStorage`
+- Provider secret values remain in the main process and are never readable through the renderer bridge
 
 ## Next implementation order
 
@@ -59,7 +61,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - [x] Restore the last conversation for each Profile.
 - [x] Add safe configuration backup/export.
 - [x] Add safe configuration restore.
-- [ ] Add OS-backed secret storage for provider credentials when needed.
+- [x] Add OS-backed secret storage for provider credentials when needed.
 - [ ] Expand health checks into separate Session / Network / Messages / Translation signals.
 
 ### Messaging
@@ -91,3 +93,5 @@ This document locks the implementation to the agreed Unified Chat product defini
 The application must not add anti-detection, fingerprint randomization, automated challenge solving, or mechanisms intended to bypass platform security or abuse-prevention controls. Isolation is implemented as normal application-level privacy and account separation.
 
 Provider pages are treated as untrusted third-party web content. The Unified Chat application bridge is available only to the local application renderer, never to WhatsApp or Telegram pages.
+
+Provider API secrets are encrypted with the OS-backed Electron `safeStorage` facility. Secret values are write-only from the renderer's perspective; the renderer can query whether a secret exists and remove or replace it, but cannot read the decrypted value.
