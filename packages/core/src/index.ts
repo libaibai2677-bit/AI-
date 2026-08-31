@@ -69,3 +69,10 @@ export const DEFAULT_TRANSLATION_STYLE: TranslationStyle = {
   length: 'natural',
   avoid: ['too formal', 'literal translation', 'excessive punctuation'],
 }
+
+export type {
+  MessagingProvider,
+  MessagingProviderRegistry,
+  ProviderConversation,
+  ProviderSnapshot,
+} from './messaging-provider'
