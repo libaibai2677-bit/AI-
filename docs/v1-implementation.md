@@ -40,9 +40,11 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Chat-first UI prototype
 - Active Profile selection persisted in local app state
 - Profile runtime status persisted from provider window lifecycle
+- Separate Session / Network / Messages / Translation health signals
 - Provider load failure changes Profile state to `Attention`
 - Provider window close changes Profile state to `Disconnected`
 - Successful provider load restores Profile state to `Connected`
+- Translation health reflects whether an encrypted DeepL or Google provider secret is configured
 - Main/preload bridge exposes per-Profile and unified message-state loading
 - Safe Profile configuration restore that never imports session cookies, credentials, tokens, or browser storage
 - Real DeepL HTTP adapter with configurable endpoint
@@ -64,7 +66,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - [x] Add safe configuration backup/export.
 - [x] Add safe configuration restore.
 - [x] Add OS-backed secret storage for provider credentials when needed.
-- [ ] Expand health checks into separate Session / Network / Messages / Translation signals.
+- [x] Expand health checks into separate Session / Network / Messages / Translation signals.
 
 ### Messaging
 
@@ -82,7 +84,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - [x] Add real DeepL adapter.
 - [x] Add real Google adapter.
 - [ ] Add language detection.
-- [ ] Add Profile Translation Memory and Personal Dictionary.
+- [x] Add Profile Translation Memory and Personal Dictionary storage + IPC.
 - [x] Add Conversation Profile UI and override model foundation.
 
 ### Intelligence
