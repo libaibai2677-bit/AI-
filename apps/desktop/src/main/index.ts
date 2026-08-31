@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation } from './profile-store'
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
+import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
 
@@ -105,6 +106,11 @@ app.whenReady().then(() => {
   ipcMain.handle('messages:load-inbox', () => loadUnifiedInbox())
   ipcMain.handle('messages:apply-snapshot', (_event, snapshot: ProviderSnapshot) => applyProviderSnapshotPersisted(snapshot))
   ipcMain.handle('messages:clear-profile', (_event, profileId: string) => clearPersistedProfileMessages(profileId))
+
+  ipcMain.handle('translation-memory:list', (_event, profileId: string) => listDictionary(profileId))
+  ipcMain.handle('translation-memory:set', (_event, profileId: string, entry) => setDictionaryEntry(profileId, entry))
+  ipcMain.handle('translation-memory:remove', (_event, profileId: string, source: string) => removeDictionaryEntry(profileId, source))
+  ipcMain.handle('translation-memory:clear', (_event, profileId: string) => clearDictionary(profileId))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
