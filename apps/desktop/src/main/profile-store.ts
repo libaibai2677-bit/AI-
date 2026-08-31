@@ -35,12 +35,7 @@ export type ProfileBackup = {
   profile: Pick<StoredProfile, 'id' | 'name' | 'provider' | 'translation' | 'language' | 'lastConversationId' | 'windowState'>
 }
 
-const defaultHealth = (status: StoredProfile['status']): ProfileHealth => ({
-  session: status,
-  network: status,
-  messages: status,
-  translation: status,
-})
+const defaultHealth = (status: StoredProfile['status']): ProfileHealth => ({ session: status, network: status, messages: status, translation: status })
 
 const defaults: StoredProfile[] = [
   { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', health: defaultHealth('connected'), translation: 'DeepL', language: 'Chinese', lastConversationId: 'john' },
@@ -49,21 +44,13 @@ const defaults: StoredProfile[] = [
   { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', health: defaultHealth('connected'), translation: 'Google', language: 'Chinese', lastConversationId: 'david' },
 ]
 
-type AppState = {
-  activeProfileId?: string
-}
+type AppState = { activeProfileId?: string }
 
-function profilesPath() {
-  return path.join(app.getPath('userData'), 'profiles.json')
-}
-
-function statePath() {
-  return path.join(app.getPath('userData'), 'app-state.json')
-}
+function profilesPath() { return path.join(app.getPath('userData'), 'profiles.json') }
+function statePath() { return path.join(app.getPath('userData'), 'app-state.json') }
 
 function normalizeProfile(profile: StoredProfile): StoredProfile {
-  if (profile.health) return profile
-  return { ...profile, health: defaultHealth(profile.status) }
+  return profile.health ? profile : { ...profile, health: defaultHealth(profile.status) }
 }
 
 export async function loadProfiles(): Promise<StoredProfile[]> {
@@ -72,9 +59,7 @@ export async function loadProfiles(): Promise<StoredProfile[]> {
     const parsed = JSON.parse(raw) as StoredProfile[]
     if (!Array.isArray(parsed)) throw new Error('Invalid profiles state')
     const profiles = parsed.map(normalizeProfile)
-    if (profiles.some((profile, index) => JSON.stringify(profile) !== JSON.stringify(parsed[index]))) {
-      await saveProfiles(profiles)
-    }
+    if (profiles.some((profile, index) => JSON.stringify(profile) !== JSON.stringify(parsed[index]))) await saveProfiles(profiles)
     return profiles
   } catch {
     await saveProfiles(defaults)
@@ -89,8 +74,7 @@ export async function saveProfiles(profiles: StoredProfile[]) {
 
 export async function loadActiveProfileId(): Promise<string | null> {
   try {
-    const raw = await readFile(statePath(), 'utf8')
-    const state = JSON.parse(raw) as AppState
+    const state = JSON.parse(await readFile(statePath(), 'utf8')) as AppState
     return state.activeProfileId ?? null
   } catch {
     return null
@@ -99,15 +83,9 @@ export async function loadActiveProfileId(): Promise<string | null> {
 
 export async function setActiveProfileId(profileId: string) {
   const profiles = await loadProfiles()
-  if (!profiles.some((profile) => profile.id === profileId)) throw new Error('Profile not found')
-
+  if (!profiles.some(profile => profile.id === profileId)) throw new Error('Profile not found')
   let state: AppState = {}
-  try {
-    state = JSON.parse(await readFile(statePath(), 'utf8')) as AppState
-  } catch {
-    // First run: create the state file below.
-  }
-
+  try { state = JSON.parse(await readFile(statePath(), 'utf8')) as AppState } catch { /* first run */ }
   state.activeProfileId = profileId
   await mkdir(path.dirname(statePath()), { recursive: true })
   await writeFile(statePath(), JSON.stringify(state, null, 2), 'utf8')
@@ -116,9 +94,8 @@ export async function setActiveProfileId(profileId: string) {
 
 export async function setProfileStatus(profileId: string, status: StoredProfile['status']) {
   const profiles = await loadProfiles()
-  const index = profiles.findIndex((profile) => profile.id === profileId)
+  const index = profiles.findIndex(profile => profile.id === profileId)
   if (index < 0) throw new Error('Profile not found')
-
   profiles[index] = { ...profiles[index], status, health: { ...profiles[index].health, session: status } }
   await saveProfiles(profiles)
   return profiles[index]
@@ -126,19 +103,11 @@ export async function setProfileStatus(profileId: string, status: StoredProfile[
 
 export async function setProfileHealth(profileId: string, component: keyof ProfileHealth, status: ProfileHealth[typeof component]) {
   const profiles = await loadProfiles()
-  const index = profiles.findIndex((profile) => profile.id === profileId)
+  const index = profiles.findIndex(profile => profile.id === profileId)
   if (index < 0) throw new Error('Profile not found')
-
   const health = { ...profiles[index].health, [component]: status }
   const values = Object.values(health)
-  const aggregate: StoredProfile['status'] = values.includes('attention')
-    ? 'attention'
-    : values.every((value) => value === 'connected')
-      ? 'connected'
-      : values.every((value) => value === 'not-configured')
-        ? 'not-configured'
-        : 'disconnected'
-
+  const aggregate: StoredProfile['status'] = values.includes('attention') ? 'attention' : values.every(value => value === 'connected') ? 'connected' : values.every(value => value === 'not-configured') ? 'not-configured' : 'disconnected'
   profiles[index] = { ...profiles[index], health, status: aggregate }
   await saveProfiles(profiles)
   return profiles[index]
@@ -146,12 +115,7 @@ export async function setProfileHealth(profileId: string, component: keyof Profi
 
 export async function createProfile(input: Pick<StoredProfile, 'name' | 'provider' | 'translation' | 'language'>) {
   const profiles = await loadProfiles()
-  const profile: StoredProfile = {
-    id: `profile-${Date.now()}`,
-    ...input,
-    status: 'not-configured',
-    health: defaultHealth('not-configured'),
-  }
+  const profile: StoredProfile = { id: `profile-${Date.now()}`, ...input, status: 'not-configured', health: defaultHealth('not-configured') }
   profiles.push(profile)
   await saveProfiles(profiles)
   return profile
@@ -159,9 +123,8 @@ export async function createProfile(input: Pick<StoredProfile, 'name' | 'provide
 
 export async function setLastConversation(profileId: string, conversationId: string) {
   const profiles = await loadProfiles()
-  const index = profiles.findIndex((profile) => profile.id === profileId)
+  const index = profiles.findIndex(profile => profile.id === profileId)
   if (index < 0) throw new Error('Profile not found')
-
   profiles[index] = { ...profiles[index], lastConversationId: conversationId }
   await saveProfiles(profiles)
   return profiles[index]
@@ -169,24 +132,18 @@ export async function setLastConversation(profileId: string, conversationId: str
 
 export async function setProfileWindowState(profileId: string, windowState: ProfileWindowState) {
   const profiles = await loadProfiles()
-  const index = profiles.findIndex((profile) => profile.id === profileId)
+  const index = profiles.findIndex(profile => profile.id === profileId)
   if (index < 0) throw new Error('Profile not found')
-
   profiles[index] = { ...profiles[index], windowState }
   await saveProfiles(profiles)
   return profiles[index]
 }
 
 export async function restoreProfileConfiguration(backup: ProfileBackup) {
-  if (backup.format !== 'unified-chat-profile' || backup.version !== 1) {
-    throw new Error('Unsupported Profile backup format')
-  }
-  if (!backup.profile?.id || !backup.profile.name || !backup.profile.provider || !backup.profile.translation || !backup.profile.language) {
-    throw new Error('Invalid Profile backup')
-  }
-
+  if (backup.format !== 'unified-chat-profile' || backup.version !== 1) throw new Error('Unsupported Profile backup format')
+  if (!backup.profile?.id || !backup.profile.name || !backup.profile.provider || !backup.profile.translation || !backup.profile.language) throw new Error('Invalid Profile backup')
   const profiles = await loadProfiles()
-  const index = profiles.findIndex((profile) => profile.id === backup.profile.id)
+  const index = profiles.findIndex(profile => profile.id === backup.profile.id)
   const existing = index >= 0 ? profiles[index] : undefined
   const restored: StoredProfile = {
     ...(existing ?? { status: 'not-configured' as const, health: defaultHealth('not-configured') }),
@@ -200,7 +157,6 @@ export async function restoreProfileConfiguration(backup: ProfileBackup) {
     status: existing?.status ?? 'not-configured',
     health: existing?.health ?? defaultHealth('not-configured'),
   }
-
   if (index >= 0) profiles[index] = restored
   else profiles.push(restored)
   await saveProfiles(profiles)
