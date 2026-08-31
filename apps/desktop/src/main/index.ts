@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
-import { createProfile, loadProfiles, setLastConversation } from './profile-store'
+import { createProfile, loadActiveProfileId, loadProfiles, setActiveProfileId, setLastConversation } from './profile-store'
 import { openProfileWindow } from './profile-window'
 
 let mainWindow: BrowserWindow | null = null
@@ -41,12 +41,15 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('profiles:list', () => loadProfiles())
+  ipcMain.handle('profiles:active', () => loadActiveProfileId())
+  ipcMain.handle('profiles:set-active', (_event, profileId: string) => setActiveProfileId(profileId))
   ipcMain.handle('profiles:create', (_event, input) => createProfile(input))
   ipcMain.handle('profiles:set-last-conversation', (_event, profileId: string, conversationId: string) => setLastConversation(profileId, conversationId))
   ipcMain.handle('profiles:open', async (_event, profileId: string) => {
     const profiles = await loadProfiles()
     const profile = profiles.find((item) => item.id === profileId)
     if (!profile) throw new Error('Profile not found')
+    await setActiveProfileId(profileId)
     openProfileWindow(profile)
     return profile
   })
