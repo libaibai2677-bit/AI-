@@ -9,6 +9,7 @@ type UnifiedChatProfile = {
 }
 
 type UnifiedChatProfileInput = Pick<UnifiedChatProfile, 'name' | 'provider' | 'translation' | 'language'>
+type UnifiedChatTranslationProvider = 'DeepL' | 'Google'
 
 type UnifiedChatDictionaryEntry = {
   source: string
@@ -76,6 +77,10 @@ declare global {
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
       backupProfile: (profileId: string) => Promise<{ canceled: boolean; filePath?: string }>
       restoreProfile: () => Promise<{ canceled: boolean; profile?: UnifiedChatProfile }>
+      setProviderSecret: (profileId: string, provider: UnifiedChatTranslationProvider, value: string) => Promise<void>
+      getProviderSecret: (profileId: string, provider: UnifiedChatTranslationProvider) => Promise<string | null>
+      hasProviderSecret: (profileId: string, provider: UnifiedChatTranslationProvider) => Promise<boolean>
+      removeProviderSecret: (profileId: string, provider: UnifiedChatTranslationProvider) => Promise<void>
       loadMessagesForProfile: (profileId: string) => Promise<{ conversations: UnifiedChatConversation[]; messages: UnifiedChatMessage[] }>
       loadUnifiedMessages: () => Promise<UnifiedChatMessageState>
       loadUnifiedInbox: () => Promise<UnifiedChatIndexedConversation[]>
