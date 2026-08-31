@@ -61,6 +61,7 @@ declare global {
       setLastConversation: (profileId: string, conversationId: string) => Promise<UnifiedChatProfile>
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
       backupProfile: (profileId: string) => Promise<{ canceled: boolean; filePath?: string }>
+      restoreProfile: () => Promise<{ canceled: boolean; profile?: UnifiedChatProfile }>
       loadMessagesForProfile: (profileId: string) => Promise<{ conversations: UnifiedChatConversation[]; messages: UnifiedChatMessage[] }>
       loadUnifiedMessages: () => Promise<UnifiedChatMessageState>
       applyProviderSnapshot: (snapshot: UnifiedChatProviderSnapshot) => Promise<UnifiedChatMessageState>
