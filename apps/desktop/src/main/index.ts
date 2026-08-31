@@ -1,4 +1,5 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 
 let mainWindow: BrowserWindow | null = null
@@ -38,6 +39,29 @@ app.whenReady().then(() => {
   }
 
   ipcMain.handle('app:version', () => app.getVersion())
+
+  ipcMain.handle('profile:backup', async (_event, payload: unknown) => {
+    if (!payload || typeof payload !== 'object') throw new Error('Invalid profile backup payload')
+
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      title: 'Export Profile Backup',
+      defaultPath: 'Profile.profile',
+      filters: [{ name: 'Unified Chat Profile', extensions: ['profile'] }],
+    })
+
+    if (result.canceled || !result.filePath) return { canceled: true }
+
+    // Credentials, cookies, sessions and browser storage are deliberately not
+    // accepted here. The renderer sends only portable profile configuration.
+    await fs.writeFile(result.filePath, JSON.stringify({
+      format: 'unified-chat-profile',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: payload,
+    }, null, 2), 'utf8')
+
+    return { canceled: false, path: result.filePath }
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
