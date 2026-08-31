@@ -1,9 +1,10 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
-import { createProfile, loadActiveProfileId, loadProfiles, setActiveProfileId, setLastConversation } from './profile-store'
+import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation } from './profile-store'
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedMessageState } from './message-store'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
+import type { ProfileBackup } from './profile-store'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -69,8 +70,8 @@ app.whenReady().then(() => {
 
     const { writeFile } = await import('node:fs/promises')
     const payload = {
-      format: 'unified-chat-profile',
-      version: 1,
+      format: 'unified-chat-profile' as const,
+      version: 1 as const,
       exportedAt: new Date().toISOString(),
       profile: {
         id: profile.id,
@@ -84,6 +85,19 @@ app.whenReady().then(() => {
     }
     await writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf8')
     return { canceled: false, filePath: result.filePath }
+  })
+  ipcMain.handle('profiles:restore', async () => {
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+      title: 'Restore Profile Configuration',
+      properties: ['openFile'],
+      filters: [{ name: 'Unified Chat Profile', extensions: ['profile.json', 'json'] }],
+    })
+    if (result.canceled || !result.filePaths[0]) return { canceled: true }
+
+    const { readFile } = await import('node:fs/promises')
+    const backup = JSON.parse(await readFile(result.filePaths[0], 'utf8')) as ProfileBackup
+    const profile = await restoreProfileConfiguration(backup)
+    return { canceled: false, profile }
   })
 
   ipcMain.handle('messages:load-profile', (_event, profileId: string) => loadMessagesForProfile(profileId))
