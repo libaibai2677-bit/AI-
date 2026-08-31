@@ -73,6 +73,16 @@ export async function setActiveProfileId(profileId: string) {
   return profileId
 }
 
+export async function setProfileStatus(profileId: string, status: StoredProfile['status']) {
+  const profiles = await loadProfiles()
+  const index = profiles.findIndex((profile) => profile.id === profileId)
+  if (index < 0) throw new Error('Profile not found')
+
+  profiles[index] = { ...profiles[index], status }
+  await saveProfiles(profiles)
+  return profiles[index]
+}
+
 export async function createProfile(input: Pick<StoredProfile, 'name' | 'provider' | 'translation' | 'language'>) {
   const profiles = await loadProfiles()
   const profile: StoredProfile = {
