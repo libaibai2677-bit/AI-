@@ -31,6 +31,13 @@ export class DeepLTranslationProvider implements TranslationProvider {
   }
 
   async translate(request: TranslationRequest): Promise<string> {
+    const results = await this.translateBatch([request])
+    return results[0]
+  }
+
+  async translateBatch(requests: TranslationRequest[]): Promise<string[]> {
+    if (requests.length === 0) return []
+    const first = requests[0]
     const response = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
@@ -38,18 +45,19 @@ export class DeepLTranslationProvider implements TranslationProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: [request.text],
-        source_lang: request.sourceLanguage && request.sourceLanguage !== 'auto' ? request.sourceLanguage.toUpperCase() : undefined,
-        target_lang: request.targetLanguage.toUpperCase(),
+        text: requests.map((request) => request.text),
+        source_lang: first.sourceLanguage && first.sourceLanguage !== 'auto' ? first.sourceLanguage.toUpperCase() : undefined,
+        target_lang: first.targetLanguage.toUpperCase(),
       }),
     })
     const payload = await readJson(response)
     assertOk(response, payload, 'DeepL')
 
     const translations = (payload as { translations?: Array<{ text?: string }> }).translations
-    const text = translations?.[0]?.text
-    if (!text) throw new Error('DeepL returned no translated text')
-    return text
+    if (!translations || translations.length !== requests.length) throw new Error('DeepL returned an unexpected batch size')
+    const texts = translations.map((item) => item.text ?? '')
+    if (texts.some((text) => !text)) throw new Error('DeepL returned an empty translation')
+    return texts
   }
 }
 
@@ -64,6 +72,13 @@ export class GoogleTranslationProvider implements TranslationProvider {
   }
 
   async translate(request: TranslationRequest): Promise<string> {
+    const results = await this.translateBatch([request])
+    return results[0]
+  }
+
+  async translateBatch(requests: TranslationRequest[]): Promise<string[]> {
+    if (requests.length === 0) return []
+    const first = requests[0]
     const url = new URL(this.endpoint)
     url.searchParams.set('key', this.apiKey)
 
@@ -71,9 +86,9 @@ export class GoogleTranslationProvider implements TranslationProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        q: request.text,
-        target: request.targetLanguage,
-        ...(request.sourceLanguage && request.sourceLanguage !== 'auto' ? { source: request.sourceLanguage } : {}),
+        q: requests.map((request) => request.text),
+        target: first.targetLanguage,
+        ...(first.sourceLanguage && first.sourceLanguage !== 'auto' ? { source: first.sourceLanguage } : {}),
         format: 'text',
       }),
     })
@@ -81,9 +96,10 @@ export class GoogleTranslationProvider implements TranslationProvider {
     assertOk(response, payload, 'Google')
 
     const translations = (payload as { data?: { translations?: Array<{ translatedText?: string }> } }).data?.translations
-    const text = translations?.[0]?.translatedText
-    if (!text) throw new Error('Google returned no translated text')
-    return text
+    if (!translations || translations.length !== requests.length) throw new Error('Google returned an unexpected batch size')
+    const texts = translations.map((item) => item.translatedText ?? '')
+    if (texts.some((text) => !text)) throw new Error('Google returned an empty translation')
+    return texts
   }
 }
 
