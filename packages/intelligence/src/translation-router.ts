@@ -1,3 +1,5 @@
+import type { TranslationMemory } from './translation-memory'
+
 export type TranslationProviderId = 'deepl' | 'google'
 
 export interface TranslationRequest {
@@ -12,7 +14,7 @@ export interface TranslationRequest {
 
 export interface TranslationResult {
   text: string
-  provider: TranslationProviderId
+  provider: TranslationProviderId | 'memory'
   cached: boolean
 }
 
@@ -42,6 +44,7 @@ export class TranslationRouter {
   constructor(
     private readonly providers: Partial<Record<TranslationProviderId, TranslationProvider>>,
     private readonly cache: TranslationCache = new MemoryTranslationCache(),
+    private readonly memory?: TranslationMemory,
   ) {}
 
   async translate(request: TranslationRequest, preferred: TranslationProviderId = 'deepl'): Promise<TranslationResult> {
@@ -49,7 +52,7 @@ export class TranslationRouter {
     return results[0]
   }
 
-  /** Cache hits stay local; misses are submitted as one provider-native batch. */
+  /** Cache and exact Profile Translation Memory hits stay local; misses use one provider-native batch. */
   async translateBatch(requests: TranslationRequest[], preferred: TranslationProviderId = 'deepl'): Promise<TranslationResult[]> {
     if (requests.length === 0) return []
 
@@ -58,6 +61,13 @@ export class TranslationRouter {
 
     for (let index = 0; index < requests.length; index += 1) {
       const request = requests[index]
+      if (this.memory) {
+        const entry = this.memory.get(request.profileId, request.text)
+        if (entry) {
+          results[index] = { text: entry.target, provider: 'memory', cached: true }
+          continue
+        }
+      }
       const key = this.cacheKey(request)
       const cached = await this.cache.get(key)
       if (cached !== undefined) {
