@@ -27,9 +27,7 @@ export async function loadMessageStore(): Promise<PersistedMessageState> {
   try {
     const raw = await readFile(storePath(), 'utf8')
     const parsed = JSON.parse(raw) as PersistedMessageState
-    if (parsed.version !== 1 || !Array.isArray(parsed.conversations) || !Array.isArray(parsed.messages)) {
-      return emptyState()
-    }
+    if (parsed.version !== 1 || !Array.isArray(parsed.conversations) || !Array.isArray(parsed.messages)) return emptyState()
     return parsed
   } catch {
     return emptyState()
@@ -50,42 +48,40 @@ export async function applyProviderSnapshotPersisted(snapshot: ProviderSnapshot)
   for (const conversation of snapshot.conversations) {
     const key = scopedId(snapshot.profileId, conversation.id)
     const existing = conversations.get(key)
-    conversations.set(key, existing
-      ? { ...existing, ...conversation, profileId: snapshot.profileId }
-      : { ...conversation, profileId: snapshot.profileId })
+    conversations.set(key, existing ? { ...existing, ...conversation, profileId: snapshot.profileId } : { ...conversation, profileId: snapshot.profileId })
   }
 
   for (const message of snapshot.messages) {
     const key = scopedId(snapshot.profileId, message.id)
     const existing = messages.get(key)
-    messages.set(key, existing
-      ? { ...existing, ...message, profileId: snapshot.profileId }
-      : { ...message, profileId: snapshot.profileId })
+    messages.set(key, existing ? { ...existing, ...message, profileId: snapshot.profileId } : { ...message, profileId: snapshot.profileId })
   }
 
-  const next: PersistedMessageState = {
-    version: 1,
-    conversations: [...conversations.values()],
-    messages: [...messages.values()],
-    updatedAt: new Date().toISOString(),
-  }
+  const next: PersistedMessageState = { version: 1, conversations: [...conversations.values()], messages: [...messages.values()], updatedAt: new Date().toISOString() }
   await saveMessageStore(next)
   return next
 }
 
+export async function updateMessageTranslation(profileId: string, messageId: string, translatedText: string): Promise<Message> {
+  const state = await loadMessageStore()
+  const key = scopedId(profileId, messageId)
+  const index = state.messages.findIndex(item => scopedId(item.profileId, item.id) === key)
+  if (index < 0) throw new Error('Message not found')
+  const text = translatedText.trim()
+  if (!text) throw new Error('Translated text is required')
+  const updated: Message = { ...state.messages[index], translatedText: text }
+  state.messages[index] = updated
+  await saveMessageStore(state)
+  return updated
+}
+
 export async function loadMessagesForProfile(profileId: string) {
   const state = await loadMessageStore()
-  return {
-    conversations: state.conversations.filter(item => item.profileId === profileId),
-    messages: state.messages.filter(item => item.profileId === profileId),
-  }
+  return { conversations: state.conversations.filter(item => item.profileId === profileId), messages: state.messages.filter(item => item.profileId === profileId) }
 }
 
-export async function loadUnifiedMessageState() {
-  return loadMessageStore()
-}
+export async function loadUnifiedMessageState() { return loadMessageStore() }
 
-/** Build the chat-first inbox directly from the latest normalized local state. */
 export async function loadUnifiedInbox() {
   const state = await loadMessageStore()
   return buildUnifiedInbox(state.conversations, state.messages)
@@ -93,14 +89,7 @@ export async function loadUnifiedInbox() {
 
 export async function clearPersistedProfileMessages(profileId: string): Promise<void> {
   const state = await loadMessageStore()
-  await saveMessageStore({
-    version: 1,
-    conversations: state.conversations.filter(item => item.profileId !== profileId),
-    messages: state.messages.filter(item => item.profileId !== profileId),
-    updatedAt: state.updatedAt,
-  })
+  await saveMessageStore({ version: 1, conversations: state.conversations.filter(item => item.profileId !== profileId), messages: state.messages.filter(item => item.profileId !== profileId), updatedAt: state.updatedAt })
 }
 
-function scopedId(profileId: string, id: string): string {
-  return `${profileId}:${id}`
-}
+function scopedId(profileId: string, id: string): string { return `${profileId}:${id}` }
