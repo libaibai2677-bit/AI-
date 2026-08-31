@@ -12,6 +12,13 @@ export type StoredProfile = {
   lastConversationId?: string
 }
 
+export type ProfileBackup = {
+  format: 'unified-chat-profile'
+  version: 1
+  exportedAt: string
+  profile: Pick<StoredProfile, 'id' | 'name' | 'provider' | 'translation' | 'language' | 'lastConversationId'>
+}
+
 const defaults: StoredProfile[] = [
   { id: 'personal', name: 'Personal', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese', lastConversationId: 'john' },
   { id: 'work', name: 'Work', provider: 'WhatsApp', status: 'connected', translation: 'DeepL', language: 'Chinese', lastConversationId: 'client-a' },
@@ -103,4 +110,31 @@ export async function setLastConversation(profileId: string, conversationId: str
   profiles[index] = { ...profiles[index], lastConversationId: conversationId }
   await saveProfiles(profiles)
   return profiles[index]
+}
+
+export async function restoreProfileConfiguration(backup: ProfileBackup) {
+  if (backup.format !== 'unified-chat-profile' || backup.version !== 1) {
+    throw new Error('Unsupported Profile backup format')
+  }
+  if (!backup.profile?.id || !backup.profile.name || !backup.profile.provider || !backup.profile.translation || !backup.profile.language) {
+    throw new Error('Invalid Profile backup')
+  }
+
+  const profiles = await loadProfiles()
+  const index = profiles.findIndex((profile) => profile.id === backup.profile.id)
+  const restored: StoredProfile = {
+    ...(index >= 0 ? profiles[index] : { status: 'not-configured' as const }),
+    id: backup.profile.id,
+    name: backup.profile.name,
+    provider: backup.profile.provider,
+    translation: backup.profile.translation,
+    language: backup.profile.language,
+    lastConversationId: backup.profile.lastConversationId,
+    status: index >= 0 ? profiles[index].status : 'not-configured',
+  }
+
+  if (index >= 0) profiles[index] = restored
+  else profiles.push(restored)
+  await saveProfiles(profiles)
+  return restored
 }
