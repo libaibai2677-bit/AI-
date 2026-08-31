@@ -10,6 +10,7 @@ const providerUrls = {
 } as const
 
 const windows = new Map<string, BrowserWindow>()
+const hiddenForLock = new Set<string>()
 
 function safeBounds(profile: StoredProfile) {
   const saved = profile.windowState
@@ -43,6 +44,7 @@ export function openProfileWindow(profile: StoredProfile) {
   if (existing && !existing.isDestroyed()) {
     existing.show()
     existing.focus()
+    hiddenForLock.delete(profile.id)
     void setProfileStatus(profile.id, 'connected')
     void setProfileHealth(profile.id, 'network', 'connected')
     void refreshTranslationHealth(profile)
@@ -75,7 +77,7 @@ export function openProfileWindow(profile: StoredProfile) {
   })
 
   window.webContents.on('did-finish-load', () => {
-    void setProfileStatus(profile.id, 'connected')
+    if (!hiddenForLock.has(profile.id)) void setProfileStatus(profile.id, 'connected')
     void setProfileHealth(profile.id, 'network', 'connected')
   })
 
@@ -90,12 +92,33 @@ export function openProfileWindow(profile: StoredProfile) {
   window.on('closed', () => {
     persistWindowState()
     windows.delete(profile.id)
+    hiddenForLock.delete(profile.id)
     void setProfileStatus(profile.id, 'disconnected')
     void setProfileHealth(profile.id, 'network', 'disconnected')
     void setProfileHealth(profile.id, 'messages', 'disconnected')
   })
 
   void window.loadURL(providerUrls[profile.provider])
+}
+
+/** Hide provider windows while the main UI is locked. Windows stay alive so sessions are not lost. */
+export function lockProfileWindows() {
+  for (const [profileId, window] of windows.entries()) {
+    if (window.isDestroyed()) continue
+    if (window.isVisible()) {
+      hiddenForLock.add(profileId)
+      window.hide()
+    }
+  }
+}
+
+/** Restore only provider windows that were hidden by Quick Lock. */
+export function unlockProfileWindows() {
+  for (const profileId of hiddenForLock) {
+    const window = windows.get(profileId)
+    if (window && !window.isDestroyed()) window.show()
+  }
+  hiddenForLock.clear()
 }
 
 export function closeProfileWindows() {
@@ -105,5 +128,6 @@ export function closeProfileWindows() {
     void setProfileHealth(profileId, 'network', 'disconnected')
     void setProfileHealth(profileId, 'messages', 'disconnected')
   }
+  hiddenForLock.clear()
   windows.clear()
 }
