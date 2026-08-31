@@ -26,6 +26,18 @@ type UnifiedChatDictionaryEntry = {
   note?: string
 }
 
+type UnifiedChatConversationProfile = {
+  profileId: string
+  conversationId: string
+  sourceLanguage?: string
+  targetLanguage?: string
+  translationEngine?: 'DeepL' | 'Google'
+  tone?: 'Natural' | 'Casual' | 'Professional'
+  length?: 'Natural' | 'Short' | 'Detailed'
+  display?: 'Original' | 'Bilingual' | 'Translated'
+  aiTone?: 'Casual' | 'Business'
+}
+
 type UnifiedChatTranslationRequest = {
   text: string
   targetLanguage: string
@@ -103,6 +115,10 @@ declare global {
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
       backupProfile: (profileId: string) => Promise<{ canceled: boolean; filePath?: string }>
       restoreProfile: () => Promise<{ canceled: boolean; profile?: UnifiedChatProfile }>
+      getConversationProfile: (profileId: string, conversationId: string) => Promise<UnifiedChatConversationProfile | null>
+      listConversationProfiles: (profileId: string) => Promise<UnifiedChatConversationProfile[]>
+      setConversationProfile: (profile: UnifiedChatConversationProfile) => Promise<UnifiedChatConversationProfile>
+      removeConversationProfile: (profileId: string, conversationId: string) => Promise<void>
       setProviderSecret: (profileId: string, provider: UnifiedChatTranslationProvider, value: string) => Promise<void>
       hasProviderSecret: (profileId: string, provider: UnifiedChatTranslationProvider) => Promise<boolean>
       removeProviderSecret: (profileId: string, provider: UnifiedChatTranslationProvider) => Promise<void>
