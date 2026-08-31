@@ -4,12 +4,14 @@
   "private": true,
   "description": "Local-first multi-profile communication workspace for WhatsApp and Telegram.",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "dev": "electron-vite dev --config apps/desktop/electron.vite.config.ts",
+    "build": "electron-vite build --config apps/desktop/electron.vite.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "electron": "^37.0.0"
+    "electron": "^37.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
