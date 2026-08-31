@@ -22,6 +22,21 @@ type DictionaryEntry = {
 }
 
 type TranslationProvider = 'DeepL' | 'Google'
+type TranslationRequest = {
+  text: string
+  targetLanguage: string
+  sourceLanguage?: string
+  profileId: string
+  conversationId?: string
+  style?: 'natural' | 'casual' | 'professional'
+  length?: 'natural' | 'short' | 'detailed'
+}
+
+type TranslationResult = {
+  text: string
+  provider: 'deepl' | 'google'
+  cached: boolean
+}
 
 contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
@@ -45,6 +60,8 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   setTranslationMemoryEntry: (profileId: string, entry: DictionaryEntry) => ipcRenderer.invoke('translation-memory:set', profileId, entry),
   removeTranslationMemoryEntry: (profileId: string, source: string) => ipcRenderer.invoke('translation-memory:remove', profileId, source),
   clearTranslationMemory: (profileId: string) => ipcRenderer.invoke('translation-memory:clear', profileId),
+  translate: (request: TranslationRequest) => ipcRenderer.invoke('translation:translate', request) as Promise<TranslationResult>,
+  translateBatch: (requests: TranslationRequest[]) => ipcRenderer.invoke('translation:translate-batch', requests) as Promise<TranslationResult[]>,
   onQuickLock: (callback: () => void) => {
     const listener = () => callback()
     ipcRenderer.on('profile:quick-lock', listener)
