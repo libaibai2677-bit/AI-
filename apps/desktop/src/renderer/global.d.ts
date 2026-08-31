@@ -102,6 +102,18 @@ type UnifiedChatProviderSnapshot = {
   syncedAt: string
 }
 
+type UnifiedChatMessageSearchResult = {
+  profileId: string
+  platform: 'whatsapp' | 'telegram'
+  conversationId: string
+  conversationTitle: string
+  messageId: string
+  sender: string
+  text: string
+  translatedText?: string
+  timestamp: string
+}
+
 declare global {
   interface Window {
     unifiedChat?: {
@@ -125,6 +137,7 @@ declare global {
       loadMessagesForProfile: (profileId: string) => Promise<{ conversations: UnifiedChatConversation[]; messages: UnifiedChatMessage[] }>
       loadUnifiedMessages: () => Promise<UnifiedChatMessageState>
       loadUnifiedInbox: () => Promise<UnifiedChatIndexedConversation[]>
+      searchMessages: (query: string, limit?: number) => Promise<UnifiedChatMessageSearchResult[]>
       syncProfileMessages: (profileId: string) => Promise<{ profileId: string; platform: 'whatsapp' | 'telegram'; conversations: number; messages: number; syncedAt: string } | null>
       applyProviderSnapshot: (snapshot: UnifiedChatProviderSnapshot) => Promise<UnifiedChatMessageState>
       clearProfileMessages: (profileId: string) => Promise<void>
