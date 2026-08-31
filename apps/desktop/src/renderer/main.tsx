@@ -6,9 +6,9 @@ type Provider = 'WhatsApp' | 'Telegram'
 type Status = 'connected' | 'attention' | 'disconnected' | 'not-configured'
 type View = 'chats' | 'profiles' | 'search' | 'settings'
 type Filter = 'All' | 'Unread' | 'Mentions' | 'Favorites' | 'Follow Up'
-
 type Profile = UnifiedChatProfile
 type Conversation = { id: string; name: string; profileId: string; profile: string; provider: Provider; preview: string; translated: string; unread: boolean; favorite: boolean; mention: boolean; followUp: boolean; timestamp: string }
+type Message = { id: string; profileId: string; conversationId: string; platform: 'whatsapp' | 'telegram'; sender: { id: string; displayName: string }; text: string; translatedText?: string; timestamp: string; unread: boolean; mentioned: boolean; favorite: boolean; followUp: boolean }
 type InboxUpdate = { type: 'conversation-updated' | 'conversation-removed'; profileId: string; conversationId: string; conversation?: any }
 
 const fallbackProfiles: Profile[] = [
@@ -30,9 +30,16 @@ function toConversation(item: any, profiles: Profile[]): Conversation {
   return { id: item.id, name: item.title || item.participant?.displayName || 'Unknown', profileId: item.profileId, profile: profile?.name ?? item.profileId, provider: item.platform === 'whatsapp' ? 'WhatsApp' : 'Telegram', preview: message?.text ?? '', translated: message?.translatedText ?? '', unread: item.unreadCount > 0, favorite: Boolean(item.favorite), mention: item.mentionCount > 0, followUp: Boolean(item.followUp), timestamp: item.updatedAt }
 }
 
+function formatMessageTime(timestamp: string) {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 function App() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [conversations, setConversations] = useState<Conversation[]>(fallbackConversations)
+  const [messages, setMessages] = useState<Message[]>([])
   const [activeId, setActiveId] = useState('personal')
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [locked, setLocked] = useState(false)
@@ -46,8 +53,7 @@ function App() {
   const refreshInbox = async (nextProfiles: Profile[] = profiles) => {
     const inbox = await window.unifiedChat?.loadUnifiedInbox()
     if (!inbox?.length) return false
-    const nextConversations = inbox.map((item: any) => toConversation(item, nextProfiles))
-    setConversations(nextConversations)
+    setConversations(inbox.map((item: any) => toConversation(item, nextProfiles)))
     setDataSource('local')
     return true
   }
@@ -80,6 +86,25 @@ function App() {
   }, [])
 
   useEffect(() => {
+    let mounted = true
+    const loadMessages = async () => {
+      if (!selectedConversationKey || dataSource !== 'local') return
+      const separator = selectedConversationKey.indexOf(':')
+      if (separator < 0) return
+      const profileId = selectedConversationKey.slice(0, separator)
+      const conversationId = selectedConversationKey.slice(separator + 1)
+      try {
+        const result = await window.unifiedChat?.loadMessagesForProfile(profileId)
+        if (!mounted) return
+        const next = (result?.messages ?? []) as Message[]
+        setMessages(next.filter((message) => message.conversationId === conversationId).sort((a, b) => a.timestamp.localeCompare(b.timestamp)))
+      } catch { if (mounted) setMessages([]) }
+    }
+    void loadMessages()
+    return () => { mounted = false }
+  }, [selectedConversationKey, dataSource])
+
+  useEffect(() => {
     const cleanupInbox = window.unifiedChat?.onInboxUpdate((update: InboxUpdate) => {
       if (locked) return
       setConversations((current) => {
@@ -89,6 +114,16 @@ function App() {
         const without = current.filter((item) => !(item.profileId === next.profileId && item.id === next.id))
         return [next, ...without]
       })
+      if (update.type === 'conversation-updated' && update.conversation) {
+        const message = update.conversation.lastMessage as Message | undefined
+        if (message) setMessages((current) => {
+          const without = current.filter((item) => item.id !== message.id)
+          return [...without, message].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+        })
+      }
+      if (update.type === 'conversation-removed') {
+        setMessages((current) => current.filter((message) => !(message.profileId === update.profileId && message.conversationId === update.conversationId)))
+      }
       setDataSource('local')
     })
     return () => cleanupInbox?.()
@@ -101,6 +136,7 @@ function App() {
 
   const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0] ?? fallbackProfiles[0]
   const selectedConversation = conversations.find((conversation) => `${conversation.profileId}:${conversation.id}` === selectedConversationKey) ?? conversations[0]
+  const selectedMessages = useMemo(() => selectedConversation ? messages.filter((message) => message.profileId === selectedConversation.profileId && message.conversationId === selectedConversation.id) : [], [messages, selectedConversation])
   const visibleConversations = useMemo(() => {
     const query = search.trim().toLowerCase()
     return conversations.filter((conversation) => {
@@ -120,7 +156,7 @@ function App() {
 
   return <main className="app">
     <header className="topbar"><div className="brand-group"><button className="icon-button" aria-label="Menu">☰</button><button className="brand brand-button" onClick={() => switchView('chats')}>Unified Chat</button><label className="search"><span>⌕</span><input value={search} onChange={(event) => { setSearch(event.target.value); setView('search') }} placeholder="Search everywhere..." /></label></div><div className="top-actions"><div className="profile-switch-wrap"><button className="profile-switch" onClick={() => setProfileMenuOpen((open) => !open)}><StatusDot status={active.status} /> {active.name} <span className="provider-label">{active.provider}</span> ▾</button>{profileMenuOpen && <div className="profile-menu"><div className="menu-title">Profiles</div>{profiles.map((profile) => <button key={profile.id} className="profile-option" onClick={() => void openProfile(profile)}><StatusDot status={profile.status} /><span>{profile.name}</span><small>{profile.provider}</small></button>)}</div>}</div><button className="icon-button" aria-label="Lock" onClick={() => setLocked(true)}>🔒</button></div></header>
-    <section className="workspace"><aside className="sidebar"><div className="section-title">Chats</div><nav className="filters">{(['All', 'Unread', 'Mentions', 'Favorites', 'Follow Up'] as Filter[]).map((item) => <button key={item} className={filter === item ? 'active' : ''} onClick={() => { setFilter(item); setView('chats') }}>{item}</button>)}</nav><div className="conversation-list">{visibleConversations.map((conversation) => <button key={`${conversation.profileId}:${conversation.id}`} className={selectedConversationKey === `${conversation.profileId}:${conversation.id}` ? 'conversation selected' : 'conversation'} onClick={() => selectConversation(conversation)}><div className="avatar">{conversation.name.slice(0, 1)}</div><div className="conversation-body"><div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div><div className="conversation-meta">{conversation.provider} · {conversation.profile}</div><div className="preview">{conversation.preview || 'No messages yet.'}</div></div></button>)}</div><button className="profiles-link" onClick={() => switchView('profiles')}>◉ Profiles</button><button className="profiles-link" onClick={() => switchView('settings')}>⚙ Settings</button></aside><section className="chat"><div className="chat-header"><div><div className="chat-title">{selectedConversation?.name ?? 'No conversation'} <span className="online">●</span></div><div className="chat-subtitle">{selectedConversation ? `${selectedConversation.provider} · ${selectedConversation.profile}` : 'Select a conversation'}</div></div></div>{selectedConversation ? <div className="messages"><div className="message-row incoming"><div className="bubble"><div>{selectedConversation.preview}</div>{selectedConversation.translated && <div className="translation">{selectedConversation.translated}</div>}</div></div><div className="composer"><span>📎</span><input placeholder="Type a message..." /><button>🌐</button><button>✨</button><button>➤</button></div></div> : <div className="empty-chat">Select a conversation</div>}</section></section>
+    <section className="workspace"><aside className="sidebar"><div className="section-title">Chats</div><nav className="filters">{(['All', 'Unread', 'Mentions', 'Favorites', 'Follow Up'] as Filter[]).map((item) => <button key={item} className={filter === item ? 'active' : ''} onClick={() => { setFilter(item); setView('chats') }}>{item}</button>)}</nav><div className="conversation-list">{visibleConversations.map((conversation) => <button key={`${conversation.profileId}:${conversation.id}`} className={selectedConversationKey === `${conversation.profileId}:${conversation.id}` ? 'conversation selected' : 'conversation'} onClick={() => selectConversation(conversation)}><div className="avatar">{conversation.name.slice(0, 1)}</div><div className="conversation-body"><div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div><div className="conversation-meta">{conversation.provider} · {conversation.profile}</div><div className="preview">{conversation.preview || 'No messages yet.'}</div></div></button>)}</div><button className="profiles-link" onClick={() => switchView('profiles')}>◉ Profiles</button><button className="profiles-link" onClick={() => switchView('settings')}>⚙ Settings</button></aside><section className="chat"><div className="chat-header"><div><div className="chat-title">{selectedConversation?.name ?? 'No conversation'} <span className="online">●</span></div><div className="chat-subtitle">{selectedConversation ? `${selectedConversation.provider} · ${selectedConversation.profile}` : 'Select a conversation'}</div></div></div>{selectedConversation ? <div className="messages">{selectedMessages.length ? selectedMessages.map((message) => <div key={message.id} className={`message-row ${message.sender.id === selectedConversation.id ? 'outgoing' : 'incoming'}`}><div className="bubble"><div className="message-sender">{message.sender.displayName}</div><div>{message.text}</div>{message.translatedText && <div className="translation">{message.translatedText}</div>}<time>{formatMessageTime(message.timestamp)}</time></div></div>) : <div className="message-row incoming"><div className="bubble"><div>{selectedConversation.preview}</div>{selectedConversation.translated && <div className="translation">{selectedConversation.translated}</div>}<time>{formatMessageTime(selectedConversation.timestamp)}</time></div></div>}<div className="composer"><span>📎</span><input placeholder="Type a message..." /><button>🌐</button><button>✨</button><button>➤</button></div></div> : <div className="empty-chat">Select a conversation</div>}</section></section>
   </main>
 }
 
