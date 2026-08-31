@@ -25,13 +25,7 @@ type RuntimeSnapshot = {
   }>
 }
 
-/**
- * Read-only bridge between provider WebContents and the normalized Message Layer.
- *
- * This intentionally executes only a small DOM reader in the third-party page:
- * it does not inject the application preload bridge, read cookies/tokens, or
- * perform clicks, sends, challenge solving, or anti-detection work.
- */
+/** Read-only provider-page DOM reader; credentials and browser storage never enter the message model. */
 export async function syncOpenProfile(profileId: string): Promise<{
   profileId: string
   platform: MessagePlatform
@@ -59,16 +53,9 @@ export async function syncOpenProfile(profileId: string): Promise<{
       messages: runtime.messages.map(row => normalizeMessage(profileId, platform, row)),
       syncedAt,
     }
-
     await applyProviderSnapshotPersisted(snapshot)
     await setProfileHealth(profileId, 'messages', 'connected')
-    return {
-      profileId,
-      platform,
-      conversations: snapshot.conversations.length,
-      messages: snapshot.messages.length,
-      syncedAt,
-    }
+    return { profileId, platform, conversations: snapshot.conversations.length, messages: snapshot.messages.length, syncedAt }
   } catch {
     await setProfileHealth(profileId, 'messages', 'attention')
     return null
@@ -76,25 +63,16 @@ export async function syncOpenProfile(profileId: string): Promise<{
 }
 
 async function collectRuntimeSnapshot(webContents: WebContents, platform: MessagePlatform): Promise<RuntimeSnapshot> {
-  const script = platform === 'whatsapp' ? whatsappReaderScript() : telegramReaderScript()
-  return webContents.executeJavaScript(`(${script})()`, true) as Promise<RuntimeSnapshot>
-}
-
-function whatsappReaderScript() {
-  return () => readProviderDom('whatsapp')
-}
-
-function telegramReaderScript() {
-  return () => readProviderDom('telegram')
+  const script = readProviderDom.toString()
+  return webContents.executeJavaScript(`(${script})(${JSON.stringify(platform)})`, true) as Promise<RuntimeSnapshot>
 }
 
 /**
- * The reader is deliberately conservative. It only consumes text and public
- * DOM attributes already rendered by the provider page. Selectors are fallback
- * based because both providers change their DOM frequently.
+ * Conservative selectors for the rendered provider UI. Provider DOMs change,
+ * so this reader is intentionally best-effort and read-only.
  */
 function readProviderDom(platform: MessagePlatform): RuntimeSnapshot {
-  const clean = (value: string | null | undefined) => (value ?? '').replace(/\\s+/g, ' ').trim()
+  const clean = (value: string | null | undefined) => (value ?? '').replace(/\s+/g, ' ').trim()
   const hash = (value: string) => {
     let h = 2166136261
     for (let i = 0; i < value.length; i += 1) h = Math.imul(h ^ value.charCodeAt(i), 16777619)
@@ -126,7 +104,9 @@ function readProviderDom(platform: MessagePlatform): RuntimeSnapshot {
   const messageNodes = Array.from(document.querySelectorAll(messageSelectors.join(','))).slice(-200)
   const messages: RuntimeSnapshot['messages'] = []
   const activeTitle = clean(document.querySelector('[data-testid="conversation-header"] [dir="auto"], header [dir="auto"]')?.textContent)
-  const activeConversationId = activeTitle ? (conversations.find(item => item.title === activeTitle)?.id ?? hash(activeTitle)) : (conversations[0]?.id ?? hash('active'))
+  const activeConversationId = activeTitle
+    ? (conversations.find(item => item.title === activeTitle)?.id ?? hash(activeTitle))
+    : (conversations[0]?.id ?? hash('active'))
 
   for (const node of messageNodes) {
     const el = node as HTMLElement
@@ -151,23 +131,10 @@ function normalizeConversation(profileId: string, platform: MessagePlatform, row
         timestamp: row.timestamp ?? new Date().toISOString(),
       })
     : undefined
-
-  return {
-    id: row.id,
-    profileId,
-    platform,
-    title: row.title,
-    participant,
-    lastMessage,
-    unreadCount: row.unreadCount ?? 0,
-  }
+  return { id: row.id, profileId, platform, title: row.title, participant, lastMessage, unreadCount: row.unreadCount ?? 0 }
 }
 
-function normalizeMessage(
-  profileId: string,
-  platform: MessagePlatform,
-  row: RuntimeSnapshot['messages'][number],
-): Message {
+function normalizeMessage(profileId: string, platform: MessagePlatform, row: RuntimeSnapshot['messages'][number]): Message {
   return {
     id: row.id,
     profileId,
