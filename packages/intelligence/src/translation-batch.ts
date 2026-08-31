@@ -37,17 +37,18 @@ export class TranslationBatcher {
   }
 
   push(message: PendingMessage): void {
-    const queue = this.pending.get(message.conversationId) ?? []
-    queue.push(message)
-    this.pending.set(message.conversationId, queue.slice(-this.options.maxMessages))
-
-    const existingTimer = this.timers.get(message.conversationId)
-    if (existingTimer) clearTimeout(existingTimer)
+    const queue = [...(this.pending.get(message.conversationId) ?? []), message]
 
     if (queue.length >= this.options.maxMessages) {
+      this.pending.set(message.conversationId, queue.slice(-this.options.maxMessages))
       this.flush(message.conversationId)
       return
     }
+
+    this.pending.set(message.conversationId, queue)
+
+    const existingTimer = this.timers.get(message.conversationId)
+    if (existingTimer) clearTimeout(existingTimer)
 
     this.timers.set(
       message.conversationId,
