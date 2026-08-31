@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   syncProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:sync-profile', profileId),
   applyProviderSnapshot: (snapshot: ProviderSnapshot) => ipcRenderer.invoke('messages:apply-snapshot', snapshot),
   clearProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:clear-profile', profileId),
+  updateMessageTranslation: (profileId: string, messageId: string, translatedText: string) => ipcRenderer.invoke('messages:update-translation', profileId, messageId, translatedText),
   listTranslationMemory: (profileId: string) => ipcRenderer.invoke('translation-memory:list', profileId),
   setTranslationMemoryEntry: (profileId: string, entry: DictionaryEntry) => ipcRenderer.invoke('translation-memory:set', profileId, entry),
   removeTranslationMemoryEntry: (profileId: string, source: string) => ipcRenderer.invoke('translation-memory:remove', profileId, source),
