@@ -10,6 +10,8 @@ type ProfileInput = {
 contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
+  getActiveProfileId: () => ipcRenderer.invoke('profiles:active') as Promise<string | null>,
+  setActiveProfile: (profileId: string) => ipcRenderer.invoke('profiles:set-active', profileId) as Promise<string>,
   createProfile: (input: ProfileInput) => ipcRenderer.invoke('profiles:create', input),
   setLastConversation: (profileId: string, conversationId: string) => ipcRenderer.invoke('profiles:set-last-conversation', profileId, conversationId),
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
