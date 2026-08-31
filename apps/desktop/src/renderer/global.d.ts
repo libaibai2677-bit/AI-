@@ -15,6 +15,8 @@ declare global {
     unifiedChat?: {
       getVersion: () => Promise<string>
       listProfiles: () => Promise<UnifiedChatProfile[]>
+      getActiveProfileId: () => Promise<string | null>
+      setActiveProfile: (profileId: string) => Promise<string>
       createProfile: (input: UnifiedChatProfileInput) => Promise<UnifiedChatProfile>
       setLastConversation: (profileId: string, conversationId: string) => Promise<UnifiedChatProfile>
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
