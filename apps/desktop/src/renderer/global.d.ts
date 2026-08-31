@@ -109,6 +109,7 @@ declare global {
       loadMessagesForProfile: (profileId: string) => Promise<{ conversations: UnifiedChatConversation[]; messages: UnifiedChatMessage[] }>
       loadUnifiedMessages: () => Promise<UnifiedChatMessageState>
       loadUnifiedInbox: () => Promise<UnifiedChatIndexedConversation[]>
+      syncProfileMessages: (profileId: string) => Promise<{ profileId: string; platform: 'whatsapp' | 'telegram'; conversations: number; messages: number; syncedAt: string } | null>
       applyProviderSnapshot: (snapshot: UnifiedChatProviderSnapshot) => Promise<UnifiedChatMessageState>
       clearProfileMessages: (profileId: string) => Promise<void>
       listTranslationMemory: (profileId: string) => Promise<UnifiedChatDictionaryEntry[]>
