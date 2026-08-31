@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   setLastConversation: (profileId: string, conversationId: string) => ipcRenderer.invoke('profiles:set-last-conversation', profileId, conversationId),
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
+  restoreProfile: () => ipcRenderer.invoke('profiles:restore'),
   loadMessagesForProfile: (profileId: string) => ipcRenderer.invoke('messages:load-profile', profileId),
   loadUnifiedMessages: () => ipcRenderer.invoke('messages:load-unified'),
   applyProviderSnapshot: (snapshot: ProviderSnapshot) => ipcRenderer.invoke('messages:apply-snapshot', snapshot),
