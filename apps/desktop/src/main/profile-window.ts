@@ -1,5 +1,4 @@
 import { BrowserWindow } from 'electron'
-import path from 'node:path'
 import type { StoredProfile } from './profile-store'
 import { setProfileStatus } from './profile-store'
 
@@ -26,10 +25,12 @@ export function openProfileWindow(profile: StoredProfile) {
     minHeight: 620,
     title: `${profile.provider} · ${profile.name}`,
     webPreferences: {
+      // Provider pages are untrusted third-party web content. Do not expose the
+      // Unified Chat preload bridge to them; the application UI owns that bridge.
       partition: `persist:unified-chat-${profile.id}`,
-      preload: path.join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   })
 
