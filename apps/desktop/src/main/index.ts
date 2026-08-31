@@ -4,6 +4,7 @@ import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfigu
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
+import { getProviderSecret, hasProviderSecret, removeProviderSecret, setProviderSecret } from './secret-store'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 import type { ProfileBackup } from './profile-store'
 
@@ -100,6 +101,11 @@ app.whenReady().then(() => {
     const profile = await restoreProfileConfiguration(backup)
     return { canceled: false, profile }
   })
+
+  ipcMain.handle('provider-secret:set', (_event, profileId: string, provider: 'DeepL' | 'Google', value: string) => setProviderSecret(profileId, provider, value))
+  ipcMain.handle('provider-secret:get', (_event, profileId: string, provider: 'DeepL' | 'Google') => getProviderSecret(profileId, provider))
+  ipcMain.handle('provider-secret:has', (_event, profileId: string, provider: 'DeepL' | 'Google') => hasProviderSecret(profileId, provider))
+  ipcMain.handle('provider-secret:remove', (_event, profileId: string, provider: 'DeepL' | 'Google') => removeProviderSecret(profileId, provider))
 
   ipcMain.handle('messages:load-profile', (_event, profileId: string) => loadMessagesForProfile(profileId))
   ipcMain.handle('messages:load-unified', () => loadUnifiedMessageState())
