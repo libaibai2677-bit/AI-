@@ -43,14 +43,15 @@ export class TranslationRouter {
     private readonly cache: TranslationCache = new MemoryTranslationCache(),
   ) {}
 
-  async translate(request: TranslationRequest): Promise<TranslationResult> {
+  async translate(request: TranslationRequest, preferred: TranslationProviderId = 'deepl'): Promise<TranslationResult> {
     const key = this.cacheKey(request)
     const cached = await this.cache.get(key)
     if (cached !== undefined) {
       return { text: cached.text, provider: cached.provider, cached: true }
     }
 
-    const order: TranslationProviderId[] = ['deepl', 'google']
+    const fallback: TranslationProviderId = preferred === 'deepl' ? 'google' : 'deepl'
+    const order: TranslationProviderId[] = [preferred, fallback]
     let lastError: unknown
     for (const id of order) {
       const provider = this.providers[id]
