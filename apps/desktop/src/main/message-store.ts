@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Conversation, Message } from '../../../../packages/messaging/src/types'
 import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
+import { buildUnifiedInbox } from '../../../../packages/message-core/src/live-inbox'
 
 type PersistedMessageState = {
   version: 1
@@ -82,6 +83,12 @@ export async function loadMessagesForProfile(profileId: string) {
 
 export async function loadUnifiedMessageState() {
   return loadMessageStore()
+}
+
+/** Build the chat-first inbox directly from the latest normalized local state. */
+export async function loadUnifiedInbox() {
+  const state = await loadMessageStore()
+  return buildUnifiedInbox(state.conversations, state.messages)
 }
 
 export async function clearPersistedProfileMessages(profileId: string): Promise<void> {
