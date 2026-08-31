@@ -12,6 +12,7 @@ const providerUrls = {
 
 const windows = new Map<string, BrowserWindow>()
 const hiddenForLock = new Set<string>()
+const sessionHealthTimers = new Map<string, NodeJS.Timeout>()
 
 function safeBounds(profile: StoredProfile) {
   const saved = profile.windowState
@@ -75,6 +76,22 @@ async function refreshSessionHealth(profile: StoredProfile, window: BrowserWindo
   }
 }
 
+function startSessionHealthPolling(profile: StoredProfile, window: BrowserWindow) {
+  const existing = sessionHealthTimers.get(profile.id)
+  if (existing) clearInterval(existing)
+  const timer = setInterval(() => {
+    if (window.isDestroyed()) return
+    void refreshSessionHealth(profile, window)
+  }, 5000)
+  sessionHealthTimers.set(profile.id, timer)
+}
+
+function stopSessionHealthPolling(profileId: string) {
+  const timer = sessionHealthTimers.get(profileId)
+  if (timer) clearInterval(timer)
+  sessionHealthTimers.delete(profileId)
+}
+
 async function restoreLastConversation(window: BrowserWindow, profile: StoredProfile) {
   if (!profile.lastConversationId || window.isDestroyed()) return
 
@@ -116,6 +133,7 @@ export function openProfileWindow(profile: StoredProfile) {
     void refreshSessionHealth(profile, existing)
     void refreshTranslationHealth(profile)
     void restoreLastConversation(existing, profile)
+    startSessionHealthPolling(profile, existing)
     return
   }
 
@@ -147,6 +165,7 @@ export function openProfileWindow(profile: StoredProfile) {
     void setProfileHealth(profile.id, 'network', 'connected')
     void refreshSessionHealth(profile, window)
     void restoreLastConversation(window, profile)
+    startSessionHealthPolling(profile, window)
   })
 
   const persistWindowState = () => {
@@ -159,6 +178,7 @@ export function openProfileWindow(profile: StoredProfile) {
   window.on('move', persistWindowState)
   window.on('closed', () => {
     persistWindowState()
+    stopSessionHealthPolling(profile.id)
     windows.delete(profile.id)
     hiddenForLock.delete(profile.id)
     void setProfileStatus(profile.id, 'disconnected')
@@ -192,6 +212,7 @@ export function unlockProfileWindows() {
 export function closeProfileWindows() {
   for (const [profileId, window] of windows.entries()) {
     if (!window.isDestroyed()) window.close()
+    stopSessionHealthPolling(profileId)
     void setProfileStatus(profileId, 'disconnected')
     void setProfileHealth(profileId, 'network', 'disconnected')
     void setProfileHealth(profileId, 'messages', 'disconnected')
