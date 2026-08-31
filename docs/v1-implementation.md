@@ -42,6 +42,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Provider window close changes Profile state to `Disconnected`
 - Successful provider load restores Profile state to `Connected`
 - Main/preload bridge exposes per-Profile and unified message-state loading
+- Safe Profile configuration restore that never imports session cookies, credentials, tokens, or browser storage
 
 ## Next implementation order
 
@@ -52,7 +53,7 @@ This document locks the implementation to the agreed Unified Chat product defini
 - [x] Add real Profile open/close lifecycle.
 - [x] Restore the last conversation for each Profile.
 - [x] Add safe configuration backup/export.
-- [ ] Add safe configuration restore.
+- [x] Add safe configuration restore.
 - [ ] Add OS-backed secret storage for provider credentials when needed.
 - [ ] Expand health checks into separate Session / Network / Messages / Translation signals.
 
