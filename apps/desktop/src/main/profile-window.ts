@@ -40,6 +40,41 @@ async function refreshTranslationHealth(profile: StoredProfile) {
   await setProfileHealth(profile.id, 'translation', deepl || google ? 'connected' : 'not-configured')
 }
 
+async function refreshSessionHealth(profile: StoredProfile, window: BrowserWindow) {
+  if (window.isDestroyed()) return
+
+  try {
+    const loggedIn = await window.webContents.executeJavaScript(`
+      (() => {
+        const clean = (value) => (value || '').replace(/\\s+/g, ' ').trim().toLowerCase()
+        const body = clean(document.body?.innerText)
+        const url = location.href.toLowerCase()
+
+        if (url.includes('whatsapp.com')) {
+          const workspace = document.querySelector('[data-testid="chat-list"], [data-testid="side"], [data-testid="chat-list-search"]')
+          const loginPrompt = body.includes('use whatsapp on your computer') || body.includes('scan the qr code')
+          return Boolean(workspace) && !loginPrompt
+        }
+
+        const workspace = document.querySelector('.chatlist, [data-peer-id], #column-left, [class*="chatlist"]')
+        const loginPrompt = body.includes('log in') && (body.includes('phone number') || body.includes('country'))
+        return Boolean(workspace) && !loginPrompt
+      })()
+    `, true) as boolean
+
+    if (loggedIn) {
+      await setProfileStatus(profile.id, 'connected')
+      await setProfileHealth(profile.id, 'session', 'connected')
+    } else {
+      await setProfileStatus(profile.id, 'attention')
+      await setProfileHealth(profile.id, 'session', 'attention')
+    }
+  } catch {
+    await setProfileStatus(profile.id, 'attention')
+    await setProfileHealth(profile.id, 'session', 'attention')
+  }
+}
+
 async function restoreLastConversation(window: BrowserWindow, profile: StoredProfile) {
   if (!profile.lastConversationId || window.isDestroyed()) return
 
@@ -78,8 +113,7 @@ export function openProfileWindow(profile: StoredProfile) {
     existing.show()
     existing.focus()
     hiddenForLock.delete(profile.id)
-    void setProfileStatus(profile.id, 'connected')
-    void setProfileHealth(profile.id, 'network', 'connected')
+    void refreshSessionHealth(profile, existing)
     void refreshTranslationHealth(profile)
     void restoreLastConversation(existing, profile)
     return
@@ -101,7 +135,6 @@ export function openProfileWindow(profile: StoredProfile) {
   })
 
   windows.set(profile.id, window)
-  void setProfileStatus(profile.id, 'connected')
   void setProfileHealth(profile.id, 'network', 'connected')
   void refreshTranslationHealth(profile)
 
@@ -111,8 +144,8 @@ export function openProfileWindow(profile: StoredProfile) {
   })
 
   window.webContents.on('did-finish-load', () => {
-    if (!hiddenForLock.has(profile.id)) void setProfileStatus(profile.id, 'connected')
     void setProfileHealth(profile.id, 'network', 'connected')
+    void refreshSessionHealth(profile, window)
     void restoreLastConversation(window, profile)
   })
 
