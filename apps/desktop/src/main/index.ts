@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
 import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation, setProfileHealth } from './profile-store'
-import { openProfileWindow } from './profile-window'
+import { lockProfileWindows, openProfileWindow, unlockProfileWindows } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { searchUnifiedMessages } from './message-search'
 import { syncOpenProfile } from './provider-runtime-sync'
@@ -40,6 +40,7 @@ app.whenReady().then(() => {
   createWindow()
 
   globalShortcut.register('CommandOrControl+Shift+L', () => {
+    lockProfileWindows()
     mainWindow?.webContents.send('profile:quick-lock')
   })
 
@@ -106,6 +107,15 @@ app.whenReady().then(() => {
     const backup = JSON.parse(await readFile(result.filePaths[0], 'utf8')) as ProfileBackup
     const profile = await restoreProfileConfiguration(backup)
     return { canceled: false, profile }
+  })
+
+  ipcMain.handle('profiles:lock', () => {
+    lockProfileWindows()
+    return true
+  })
+  ipcMain.handle('profiles:unlock', () => {
+    unlockProfileWindows()
+    return true
   })
 
   ipcMain.handle('conversation-profile:get', (_event, profileId: string, conversationId: string) => getConversationProfile(profileId, conversationId))
