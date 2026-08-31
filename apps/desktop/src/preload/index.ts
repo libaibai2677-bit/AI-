@@ -21,6 +21,8 @@ type DictionaryEntry = {
   note?: string
 }
 
+type TranslationProvider = 'DeepL' | 'Google'
+
 contextBridge.exposeInMainWorld('unifiedChat', {
   getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
@@ -31,6 +33,10 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
   restoreProfile: () => ipcRenderer.invoke('profiles:restore'),
+  setProviderSecret: (profileId: string, provider: TranslationProvider, value: string) => ipcRenderer.invoke('provider-secret:set', profileId, provider, value) as Promise<void>,
+  getProviderSecret: (profileId: string, provider: TranslationProvider) => ipcRenderer.invoke('provider-secret:get', profileId, provider) as Promise<string | null>,
+  hasProviderSecret: (profileId: string, provider: TranslationProvider) => ipcRenderer.invoke('provider-secret:has', profileId, provider) as Promise<boolean>,
+  removeProviderSecret: (profileId: string, provider: TranslationProvider) => ipcRenderer.invoke('provider-secret:remove', profileId, provider) as Promise<void>,
   loadMessagesForProfile: (profileId: string) => ipcRenderer.invoke('messages:load-profile', profileId),
   loadUnifiedMessages: () => ipcRenderer.invoke('messages:load-unified'),
   loadUnifiedInbox: () => ipcRenderer.invoke('messages:load-inbox'),
