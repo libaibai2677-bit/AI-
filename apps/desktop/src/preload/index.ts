@@ -15,6 +15,9 @@ type ProviderSnapshot = {
   syncedAt: string
 }
 
+type ProfileHealthStatus = 'connected' | 'attention' | 'disconnected' | 'not-configured'
+type ProfileHealthComponent = 'session' | 'network' | 'messages' | 'translation'
+
 type DictionaryEntry = {
   source: string
   target: string
@@ -45,6 +48,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   setActiveProfile: (profileId: string) => ipcRenderer.invoke('profiles:set-active', profileId) as Promise<string>,
   createProfile: (input: ProfileInput) => ipcRenderer.invoke('profiles:create', input),
   setLastConversation: (profileId: string, conversationId: string) => ipcRenderer.invoke('profiles:set-last-conversation', profileId, conversationId),
+  setProfileHealth: (profileId: string, component: ProfileHealthComponent, status: ProfileHealthStatus) => ipcRenderer.invoke('profiles:set-health', profileId, component, status),
   openProfile: (profileId: string) => ipcRenderer.invoke('profiles:open', profileId),
   backupProfile: (profileId: string) => ipcRenderer.invoke('profiles:backup', profileId) as Promise<{ canceled: boolean; filePath?: string }>,
   restoreProfile: () => ipcRenderer.invoke('profiles:restore'),
