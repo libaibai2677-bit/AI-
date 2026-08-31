@@ -21,6 +21,7 @@ type Conversation = {
   favorite: boolean
   mention: boolean
   followUp: boolean
+  timestamp: string
 }
 
 const fallbackProfiles: Profile[] = [
@@ -30,10 +31,10 @@ const fallbackProfiles: Profile[] = [
   { id: 'telegram', name: 'Personal', provider: 'Telegram', status: 'connected', translation: 'Google', language: 'Chinese' },
 ]
 
-const initialConversations: Conversation[] = [
-  { id: 'john', name: 'John', profileId: 'personal', profile: 'Personal', provider: 'WhatsApp', preview: 'Are you free tomorrow?', translated: '明天有空吗？', unread: true, favorite: true, mention: false, followUp: true },
-  { id: 'client-a', name: 'Client A', profileId: 'work', profile: 'Work', provider: 'WhatsApp', preview: 'Can you send me the file?', translated: '你可以把文件发给我吗？', unread: true, favorite: false, mention: true, followUp: true },
-  { id: 'david', name: 'David', profileId: 'telegram', profile: 'Personal', provider: 'Telegram', preview: 'See you later.', translated: '晚点见。', unread: false, favorite: true, mention: false, followUp: false },
+const fallbackConversations: Conversation[] = [
+  { id: 'john', name: 'John', profileId: 'personal', profile: 'Personal', provider: 'WhatsApp', preview: 'Are you free tomorrow?', translated: '明天有空吗？', unread: true, favorite: true, mention: false, followUp: true, timestamp: '2026-08-31T08:00:00.000Z' },
+  { id: 'client-a', name: 'Client A', profileId: 'work', profile: 'Work', provider: 'WhatsApp', preview: 'Can you send me the file?', translated: '你可以把文件发给我吗？', unread: true, favorite: false, mention: true, followUp: true, timestamp: '2026-08-31T07:30:00.000Z' },
+  { id: 'david', name: 'David', profileId: 'telegram', profile: 'Personal', provider: 'Telegram', preview: 'See you later.', translated: '晚点见。', unread: false, favorite: true, mention: false, followUp: false, timestamp: '2026-08-30T12:00:00.000Z' },
 ]
 
 const filterRules: Record<Filter, (conversation: Conversation) => boolean> = {
@@ -44,61 +45,106 @@ const filterRules: Record<Filter, (conversation: Conversation) => boolean> = {
   'Follow Up': (conversation) => conversation.followUp,
 }
 
+function statusLabel(status: Status) {
+  return status === 'connected' ? 'Connected' : status === 'attention' ? 'Attention' : status === 'disconnected' ? 'Disconnected' : 'Not configured'
+}
+
 function StatusDot({ status }: { status: Status }) {
-  const label = status === 'connected' ? 'Connected' : status === 'attention' ? 'Attention' : status === 'disconnected' ? 'Disconnected' : 'Not configured'
+  const label = statusLabel(status)
   return <span className={`status ${status}`} title={label} aria-label={label} />
+}
+
+function toConversation(
+  item: UnifiedChatIndexedConversation,
+  profiles: Profile[],
+): Conversation {
+  const profile = profiles.find((candidate) => candidate.id === item.profileId)
+  const message = item.lastMessage
+  return {
+    id: item.id,
+    name: item.title || item.participant?.displayName || 'Unknown',
+    profileId: item.profileId,
+    profile: profile?.name ?? item.profileId,
+    provider: item.platform === 'whatsapp' ? 'WhatsApp' : 'Telegram',
+    preview: message?.text ?? '',
+    translated: message?.translatedText ?? '',
+    unread: item.unreadCount > 0,
+    favorite: item.favorite,
+    mention: item.mentionCount > 0,
+    followUp: item.followUp,
+    timestamp: item.updatedAt,
+  }
 }
 
 function App() {
   const [profiles, setProfiles] = useState<Profile[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>(fallbackConversations)
   const [activeId, setActiveId] = useState('personal')
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [locked, setLocked] = useState(false)
   const [search, setSearch] = useState('')
   const [view, setView] = useState<View>('chats')
   const [filter, setFilter] = useState<Filter>('All')
-  const [selectedConversationId, setSelectedConversationId] = useState('john')
+  const [selectedConversationKey, setSelectedConversationKey] = useState('personal:john')
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false)
   const [loadingProfiles, setLoadingProfiles] = useState(true)
   const [openingProfileId, setOpeningProfileId] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<string | null>(null)
+  const [dataSource, setDataSource] = useState<'local' | 'demo'>('demo')
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
       try {
-        const stored = await window.unifiedChat?.listProfiles()
-        if (mounted) {
-          const nextProfiles = stored?.length ? stored : fallbackProfiles
-          setProfiles(nextProfiles)
-          const preferred = nextProfiles.find((profile) => profile.id === activeId) ?? nextProfiles[0]
-          if (preferred?.lastConversationId && initialConversations.some((conversation) => conversation.id === preferred.lastConversationId)) {
-            setSelectedConversationId(preferred.lastConversationId)
-          }
+        const storedProfiles = await window.unifiedChat?.listProfiles()
+        const nextProfiles = storedProfiles?.length ? storedProfiles : fallbackProfiles
+        if (!mounted) return
+        setProfiles(nextProfiles)
+
+        const active = (await window.unifiedChat?.getActiveProfileId()) ?? nextProfiles[0]?.id ?? 'personal'
+        setActiveId(nextProfiles.some((profile) => profile.id === active) ? active : nextProfiles[0]?.id ?? 'personal')
+
+        const inbox = await window.unifiedChat?.loadUnifiedInbox()
+        if (mounted && inbox?.length) {
+          const nextConversations = inbox.map((item) => toConversation(item, nextProfiles))
+          setConversations(nextConversations)
+          setDataSource('local')
+          const preferredProfile = nextProfiles.find((profile) => profile.id === active)
+          const preferred = preferredProfile?.lastConversationId
+            ? nextConversations.find((conversation) => conversation.profileId === preferredProfile.id && conversation.id === preferredProfile.lastConversationId)
+            : undefined
+          const first = preferred ?? nextConversations[0]
+          if (first) setSelectedConversationKey(`${first.profileId}:${first.id}`)
+        } else if (mounted) {
+          const preferredProfile = nextProfiles.find((profile) => profile.id === active)
+          if (preferredProfile?.lastConversationId) setSelectedConversationKey(`${preferredProfile.id}:${preferredProfile.lastConversationId}`)
         }
       } catch {
-        if (mounted) setProfiles(fallbackProfiles)
+        if (mounted) {
+          setProfiles(fallbackProfiles)
+          setDataSource('demo')
+        }
       } finally {
         if (mounted) setLoadingProfiles(false)
       }
     }
     void load()
     return () => { mounted = false }
-  }, [activeId])
+  }, [])
 
   const active = profiles.find((profile) => profile.id === activeId) ?? profiles[0] ?? fallbackProfiles[0]
-  const selectedConversation = initialConversations.find((conversation) => conversation.id === selectedConversationId) ?? initialConversations[0]
+  const selectedConversation = conversations.find((conversation) => `${conversation.profileId}:${conversation.id}` === selectedConversationKey) ?? conversations[0]
 
   const visibleConversations = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return initialConversations.filter((conversation) => {
+    return conversations.filter((conversation) => {
       const matchesFilter = filterRules[filter](conversation)
       const matchesSearch = !query || `${conversation.name} ${conversation.profile} ${conversation.provider} ${conversation.preview} ${conversation.translated}`.toLowerCase().includes(query)
       return matchesFilter && matchesSearch
     })
-  }, [filter, search])
+  }, [conversations, filter, search])
 
   useEffect(() => {
     const cleanupLock = window.unifiedChat?.onQuickLock(() => setLocked(true))
@@ -114,9 +160,8 @@ function App() {
 
   const openProfile = async (profile: Profile) => {
     setActiveId(profile.id)
-    if (profile.lastConversationId && initialConversations.some((conversation) => conversation.id === profile.lastConversationId)) {
-      setSelectedConversationId(profile.lastConversationId)
-    }
+    const last = conversations.find((conversation) => conversation.profileId === profile.id && conversation.id === profile.lastConversationId)
+    if (last) setSelectedConversationKey(`${last.profileId}:${last.id}`)
     setOpeningProfileId(profile.id)
     try {
       await window.unifiedChat?.openProfile(profile.id)
@@ -126,7 +171,8 @@ function App() {
   }
 
   const selectConversation = (conversation: Conversation) => {
-    setSelectedConversationId(conversation.id)
+    setSelectedConversationKey(`${conversation.profileId}:${conversation.id}`)
+    setActiveId(conversation.profileId)
     setView('chats')
     void window.unifiedChat?.setLastConversation(conversation.profileId, conversation.id)
   }
@@ -230,12 +276,12 @@ function App() {
           </nav>
           <div className="conversation-list">
             {visibleConversations.map((conversation) => (
-              <button key={conversation.id} className={selectedConversationId === conversation.id ? 'conversation selected' : 'conversation'} onClick={() => selectConversation(conversation)}>
+              <button key={`${conversation.profileId}:${conversation.id}`} className={selectedConversationKey === `${conversation.profileId}:${conversation.id}` ? 'conversation selected' : 'conversation'} onClick={() => selectConversation(conversation)}>
                 <div className="avatar">{conversation.name.slice(0, 1)}</div>
                 <div className="conversation-body">
                   <div className="conversation-top"><strong>{conversation.name}</strong>{conversation.unread && <span className="unread-dot" />}</div>
                   <div className="conversation-meta">{conversation.provider} · {conversation.profile}</div>
-                  <div className="preview">{conversation.preview}</div>
+                  <div className="preview">{conversation.preview || 'No messages yet.'}</div>
                 </div>
               </button>
             ))}
@@ -282,22 +328,27 @@ function App() {
           <section className="chat">
             <div className="chat-header">
               <div>
-                <div className="chat-title">{selectedConversation.name} <span className="online">●</span></div>
-                <div className="chat-subtitle">{selectedConversation.provider} · {selectedConversation.profile} · {profiles.find((profile) => profile.id === selectedConversation.profileId)?.translation ?? 'DeepL'}</div>
+                <div className="chat-title">{selectedConversation?.name ?? 'No conversation'} <span className="online">●</span></div>
+                <div className="chat-subtitle">{selectedConversation?.provider ?? active.provider} · {selectedConversation?.profile ?? active.name} · {profiles.find((profile) => profile.id === selectedConversation?.profileId)?.translation ?? active.translation}</div>
               </div>
               <div className="chat-actions">
+                <span className="data-source">{dataSource === 'local' ? 'Local data' : 'Demo data'}</span>
                 <button className="ghost" onClick={() => setConversationSettingsOpen((value) => !value)}>Conversation Profile</button>
                 <button className="ghost" onClick={() => setFocusMode((value) => !value)}>{focusMode ? 'Exit Focus' : 'Focus'}</button>
               </div>
             </div>
             {conversationSettingsOpen && (
               <div className="conversation-profile">
-                <strong>Conversation Profile</strong><span>English → Chinese</span><span>{profiles.find((profile) => profile.id === selectedConversation.profileId)?.translation ?? 'DeepL'}</span><span>Natural</span><span>Bilingual</span><span>AI · Casual</span>
+                <strong>Conversation Profile</strong><span>English → Chinese</span><span>{profiles.find((profile) => profile.id === selectedConversation?.profileId)?.translation ?? active.translation}</span><span>Natural</span><span>Bilingual</span><span>AI · Casual</span>
               </div>
             )}
             <div className="messages">
-              <div className="message incoming"><div className="bubble original">{selectedConversation.preview}</div><div className="bubble translation">{selectedConversation.translated}</div></div>
-              <div className="message outgoing"><div className="bubble original">Yeah, probably.</div><div className="bubble translation">应该有空。</div></div>
+              {selectedConversation ? (
+                <>
+                  <div className="message incoming"><div className="bubble original">{selectedConversation.preview}</div>{selectedConversation.translated && <div className="bubble translation">{selectedConversation.translated}</div>}</div>
+                  <div className="message outgoing"><div className="bubble original">Yeah, probably.</div><div className="bubble translation">应该有空。</div></div>
+                </>
+              ) : <div className="empty-state">Select a conversation to start.</div>}
             </div>
             <div className="composer-wrap">
               {aiMenuOpen && <div className="ai-menu"><div className="menu-title">✨</div>{['Reply', 'Rewrite', 'Explain', 'Summarize', 'Translate'].map((action) => <button key={action} onClick={() => setAiMenuOpen(false)}>{action}</button>)}</div>}
