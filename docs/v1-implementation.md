@@ -31,39 +31,46 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Translation Router with cache and DeepL-first / Google-fallback policy
 - Provider boundary for WhatsApp and Telegram
 - Chat-first UI prototype
+- Active Profile selection persisted in local app state
+- Profile runtime status persisted from provider window lifecycle
+- Provider load failure changes Profile state to `Attention`
+- Provider window close changes Profile state to `Disconnected`
+- Successful provider load restores Profile state to `Connected`
 
 ## Next implementation order
 
 ### Profile Runtime
 
-1. Persist active Profile selection.
-2. Add Profile health checks for session, network, messages, and translation.
-3. Add real Profile open/close lifecycle.
-4. Restore the last conversation for each Profile.
-5. Add safe configuration backup and restore.
-6. Add OS-backed secret storage for provider credentials when needed.
+- [x] Persist active Profile selection.
+- [x] Add initial provider runtime health lifecycle for session/window availability.
+- [x] Add real Profile open/close lifecycle.
+- [x] Restore the last conversation for each Profile.
+- [x] Add safe configuration backup/export.
+- [ ] Add safe configuration restore.
+- [ ] Add OS-backed secret storage for provider credentials when needed.
+- [ ] Expand health checks into separate Session / Network / Messages / Translation signals.
 
 ### Messaging
 
-1. Open WhatsApp Web and Telegram Web inside the selected Profile runtime.
-2. Keep provider session state isolated by Profile.
-3. Add provider lifecycle status.
-4. Build the normalized conversation/message synchronization layer.
-5. Add unified inbox aggregation.
+- [x] Open WhatsApp Web and Telegram Web inside the selected Profile runtime.
+- [x] Keep provider session state isolated by Profile.
+- [x] Add provider lifecycle status.
+- [ ] Build the normalized conversation/message synchronization layer.
+- [ ] Add unified inbox aggregation from live provider data.
 
 ### Translation
 
-1. Add real DeepL adapter.
-2. Add real Google adapter.
-3. Add language detection.
-4. Add consecutive-message batching with a short debounce window.
-5. Add Profile Translation Memory and Personal Dictionary.
-6. Add Conversation Profile overrides.
+- [ ] Add real DeepL adapter.
+- [ ] Add real Google adapter.
+- [ ] Add language detection.
+- [ ] Add consecutive-message batching with a short debounce window.
+- [ ] Add Profile Translation Memory and Personal Dictionary.
+- [x] Add Conversation Profile UI and override model foundation.
 
 ### Intelligence
 
-1. Add the hidden `✨` action menu.
-2. Implement Reply / Rewrite / Explain / Summarize / Translate as optional adapters.
+- [x] Add the hidden `✨` action menu.
+- [ ] Implement Reply / Rewrite / Explain / Summarize / Translate as optional adapters.
 
 ## Security boundary
 
