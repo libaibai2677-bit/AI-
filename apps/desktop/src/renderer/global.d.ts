@@ -10,6 +10,12 @@ type UnifiedChatProfile = {
 
 type UnifiedChatProfileInput = Pick<UnifiedChatProfile, 'name' | 'provider' | 'translation' | 'language'>
 
+type UnifiedChatDictionaryEntry = {
+  source: string
+  target: string
+  note?: string
+}
+
 type UnifiedChatMessage = {
   id: string
   profileId: string
@@ -75,6 +81,10 @@ declare global {
       loadUnifiedInbox: () => Promise<UnifiedChatIndexedConversation[]>
       applyProviderSnapshot: (snapshot: UnifiedChatProviderSnapshot) => Promise<UnifiedChatMessageState>
       clearProfileMessages: (profileId: string) => Promise<void>
+      listTranslationMemory: (profileId: string) => Promise<UnifiedChatDictionaryEntry[]>
+      setTranslationMemoryEntry: (profileId: string, entry: UnifiedChatDictionaryEntry) => Promise<UnifiedChatDictionaryEntry>
+      removeTranslationMemoryEntry: (profileId: string, source: string) => Promise<void>
+      clearTranslationMemory: (profileId: string) => Promise<void>
       onQuickLock: (callback: () => void) => () => void
       onQuickSwitch: (callback: (index: number) => void) => () => void
     }
