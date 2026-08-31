@@ -31,6 +31,8 @@ This document locks the implementation to the agreed Unified Chat product defini
 - Profile-scoped normalized message sync store
 - Cross-Profile inbox aggregation foundation
 - Translation Router with cache and DeepL-first / Google-fallback policy
+- Router-level provider-native batch contract
+- Consecutive-message translation batching foundation
 - Provider boundary for WhatsApp and Telegram
 - Chat-first UI prototype
 - Active Profile selection persisted in local app state
@@ -63,10 +65,11 @@ This document locks the implementation to the agreed Unified Chat product defini
 
 ### Translation
 
+- [x] Add router-level provider-native batch contract.
+- [x] Add consecutive-message batching foundation with a short debounce window.
 - [ ] Add real DeepL adapter.
 - [ ] Add real Google adapter.
 - [ ] Add language detection.
-- [ ] Add consecutive-message batching with a short debounce window.
 - [ ] Add Profile Translation Memory and Personal Dictionary.
 - [x] Add Conversation Profile UI and override model foundation.
 
