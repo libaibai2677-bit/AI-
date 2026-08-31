@@ -17,6 +17,22 @@ type UnifiedChatDictionaryEntry = {
   note?: string
 }
 
+type UnifiedChatTranslationRequest = {
+  text: string
+  targetLanguage: string
+  sourceLanguage?: string
+  profileId: string
+  conversationId?: string
+  style?: 'natural' | 'casual' | 'professional'
+  length?: 'natural' | 'short' | 'detailed'
+}
+
+type UnifiedChatTranslationResult = {
+  text: string
+  provider: 'deepl' | 'google'
+  cached: boolean
+}
+
 type UnifiedChatMessage = {
   id: string
   profileId: string
@@ -89,6 +105,8 @@ declare global {
       setTranslationMemoryEntry: (profileId: string, entry: UnifiedChatDictionaryEntry) => Promise<UnifiedChatDictionaryEntry>
       removeTranslationMemoryEntry: (profileId: string, source: string) => Promise<void>
       clearTranslationMemory: (profileId: string) => Promise<void>
+      translate: (request: UnifiedChatTranslationRequest) => Promise<UnifiedChatTranslationResult>
+      translateBatch: (requests: UnifiedChatTranslationRequest[]) => Promise<UnifiedChatTranslationResult[]>
       onQuickLock: (callback: () => void) => () => void
       onQuickSwitch: (callback: (index: number) => void) => () => void
     }
