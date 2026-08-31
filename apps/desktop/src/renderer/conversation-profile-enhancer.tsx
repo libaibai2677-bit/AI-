@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { ConversationProfilePanel } from './conversation-profile-panel'
+import './conversation-profile-panel.css'
 
 let root: Root | null = null
 let mountedHost: HTMLElement | null = null
