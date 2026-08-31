@@ -19,6 +19,7 @@ export interface TranslationResult {
 export interface TranslationProvider {
   readonly id: TranslationProviderId
   translate(request: TranslationRequest): Promise<string>
+  translateBatch?(requests: TranslationRequest[]): Promise<string[]>
 }
 
 export interface TranslationCacheEntry {
@@ -44,26 +45,58 @@ export class TranslationRouter {
   ) {}
 
   async translate(request: TranslationRequest, preferred: TranslationProviderId = 'deepl'): Promise<TranslationResult> {
-    const key = this.cacheKey(request)
-    const cached = await this.cache.get(key)
-    if (cached !== undefined) {
-      return { text: cached.text, provider: cached.provider, cached: true }
+    const results = await this.translateBatch([request], preferred)
+    return results[0]
+  }
+
+  /** Cache hits stay local; misses are submitted as one provider-native batch. */
+  async translateBatch(requests: TranslationRequest[], preferred: TranslationProviderId = 'deepl'): Promise<TranslationResult[]> {
+    if (requests.length === 0) return []
+
+    const results: Array<TranslationResult | undefined> = new Array(requests.length)
+    const misses: Array<{ index: number; request: TranslationRequest; key: string }> = []
+
+    for (let index = 0; index < requests.length; index += 1) {
+      const request = requests[index]
+      const key = this.cacheKey(request)
+      const cached = await this.cache.get(key)
+      if (cached !== undefined) {
+        results[index] = { text: cached.text, provider: cached.provider, cached: true }
+      } else {
+        misses.push({ index, request, key })
+      }
     }
+
+    if (misses.length === 0) return results as TranslationResult[]
 
     const fallback: TranslationProviderId = preferred === 'deepl' ? 'google' : 'deepl'
     const order: TranslationProviderId[] = [preferred, fallback]
     let lastError: unknown
+
     for (const id of order) {
       const provider = this.providers[id]
       if (!provider) continue
       try {
-        const text = await provider.translate(request)
-        await this.cache.set(key, { text, provider: id })
-        return { text, provider: id, cached: false }
+        const texts = provider.translateBatch
+          ? await provider.translateBatch(misses.map((item) => item.request))
+          : await Promise.all(misses.map((item) => provider.translate(item.request)))
+
+        if (texts.length !== misses.length) {
+          throw new Error(`${id} returned ${texts.length} results for ${misses.length} requests`)
+        }
+
+        for (let position = 0; position < misses.length; position += 1) {
+          const item = misses[position]
+          const text = texts[position]
+          await this.cache.set(item.key, { text, provider: id })
+          results[item.index] = { text, provider: id, cached: false }
+        }
+        return results as TranslationResult[]
       } catch (error) {
         lastError = error
       }
     }
+
     throw new Error(`No translation provider succeeded: ${String(lastError ?? 'not configured')}`)
   }
 
