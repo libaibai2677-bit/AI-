@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import path from 'node:path'
 import type { StoredProfile } from './profile-store'
+import { setProfileStatus } from './profile-store'
 
 const providerUrls = {
   WhatsApp: 'https://web.whatsapp.com/',
@@ -14,6 +15,7 @@ export function openProfileWindow(profile: StoredProfile) {
   if (existing && !existing.isDestroyed()) {
     existing.show()
     existing.focus()
+    void setProfileStatus(profile.id, 'connected')
     return
   }
 
@@ -32,13 +34,28 @@ export function openProfileWindow(profile: StoredProfile) {
   })
 
   windows.set(profile.id, window)
-  window.on('closed', () => windows.delete(profile.id))
+  void setProfileStatus(profile.id, 'connected')
+
+  window.webContents.on('did-fail-load', () => {
+    void setProfileStatus(profile.id, 'attention')
+  })
+
+  window.webContents.on('did-finish-load', () => {
+    void setProfileStatus(profile.id, 'connected')
+  })
+
+  window.on('closed', () => {
+    windows.delete(profile.id)
+    void setProfileStatus(profile.id, 'disconnected')
+  })
+
   void window.loadURL(providerUrls[profile.provider])
 }
 
 export function closeProfileWindows() {
-  for (const window of windows.values()) {
+  for (const [profileId, window] of windows.entries()) {
     if (!window.isDestroyed()) window.close()
+    void setProfileStatus(profileId, 'disconnected')
   }
   windows.clear()
 }
