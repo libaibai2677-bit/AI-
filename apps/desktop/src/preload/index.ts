@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('unifiedChat', {
   loadMessagesForProfile: (profileId: string) => ipcRenderer.invoke('messages:load-profile', profileId),
   loadUnifiedMessages: () => ipcRenderer.invoke('messages:load-unified'),
   loadUnifiedInbox: () => ipcRenderer.invoke('messages:load-inbox'),
+  syncProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:sync-profile', profileId),
   applyProviderSnapshot: (snapshot: ProviderSnapshot) => ipcRenderer.invoke('messages:apply-snapshot', snapshot),
   clearProfileMessages: (profileId: string) => ipcRenderer.invoke('messages:clear-profile', profileId),
   listTranslationMemory: (profileId: string) => ipcRenderer.invoke('translation-memory:list', profileId),
