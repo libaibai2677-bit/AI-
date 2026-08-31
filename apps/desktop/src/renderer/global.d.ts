@@ -10,6 +10,46 @@ type UnifiedChatProfile = {
 
 type UnifiedChatProfileInput = Pick<UnifiedChatProfile, 'name' | 'provider' | 'translation' | 'language'>
 
+type UnifiedChatMessage = {
+  id: string
+  profileId: string
+  conversationId: string
+  platform: 'whatsapp' | 'telegram'
+  sender: { id: string; displayName: string }
+  text: string
+  translatedText?: string
+  timestamp: string
+  unread: boolean
+  mentioned: boolean
+  favorite: boolean
+  followUp: boolean
+}
+
+type UnifiedChatConversation = {
+  id: string
+  profileId: string
+  platform: 'whatsapp' | 'telegram'
+  title: string
+  participant?: { id: string; displayName: string }
+  lastMessage?: UnifiedChatMessage
+  unreadCount: number
+}
+
+type UnifiedChatMessageState = {
+  version: number
+  conversations: UnifiedChatConversation[]
+  messages: UnifiedChatMessage[]
+  updatedAt: string
+}
+
+type UnifiedChatProviderSnapshot = {
+  profileId: string
+  platform: 'whatsapp' | 'telegram'
+  conversations: UnifiedChatConversation[]
+  messages: UnifiedChatMessage[]
+  syncedAt: string
+}
+
 declare global {
   interface Window {
     unifiedChat?: {
@@ -21,6 +61,10 @@ declare global {
       setLastConversation: (profileId: string, conversationId: string) => Promise<UnifiedChatProfile>
       openProfile: (profileId: string) => Promise<UnifiedChatProfile>
       backupProfile: (profileId: string) => Promise<{ canceled: boolean; filePath?: string }>
+      loadMessagesForProfile: (profileId: string) => Promise<{ conversations: UnifiedChatConversation[]; messages: UnifiedChatMessage[] }>
+      loadUnifiedMessages: () => Promise<UnifiedChatMessageState>
+      applyProviderSnapshot: (snapshot: UnifiedChatProviderSnapshot) => Promise<UnifiedChatMessageState>
+      clearProfileMessages: (profileId: string) => Promise<void>
       onQuickLock: (callback: () => void) => () => void
       onQuickSwitch: (callback: (index: number) => void) => () => void
     }
