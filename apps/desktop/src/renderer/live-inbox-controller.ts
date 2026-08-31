@@ -1,5 +1,3 @@
-import { useEffect, useRef } from 'react'
-
 type InboxUpdate = {
   type: 'conversation-updated' | 'conversation-removed'
   profileId: string
@@ -12,35 +10,28 @@ type ConversationLike = {
   profileId: string
 }
 
-type Options<T extends ConversationLike> = {
-  onUpdate: (update: InboxUpdate, current: T[]) => T[]
-  onEmpty?: () => void
-}
+type InboxUpdater<T extends ConversationLike> = (
+  current: T[],
+  update: InboxUpdate,
+) => T[]
 
 /**
  * Subscribes a renderer surface to incremental Unified Inbox events.
- * The controller owns no data itself; the React state remains the source
- * of truth and onUpdate decides how an event is projected into that state.
+ * The caller remains the source of truth for React state. This helper only
+ * owns the event subscription and applies each event through the supplied
+ * updater, so there is no second hidden inbox state in the controller.
  */
-export function useLiveInbox<T extends ConversationLike>(
-  options: Options<T>,
-): React.MutableRefObject<T[] | null> {
-  const stateRef = useRef<T[] | null>(null)
-  const optionsRef = useRef(options)
-  optionsRef.current = options
+export function subscribeLiveInbox<T extends ConversationLike>(
+  getCurrent: () => T[],
+  setCurrent: (next: T[]) => void,
+  updater: InboxUpdater<T>,
+): () => void {
+  const cleanup = window.unifiedChat?.onInboxUpdate((update) => {
+    const next = updater(getCurrent(), update)
+    setCurrent(next)
+  })
 
-  useEffect(() => {
-    const cleanup = window.unifiedChat?.onInboxUpdate((update) => {
-      const current = stateRef.current ?? []
-      const next = optionsRef.current.onUpdate(update, current)
-      stateRef.current = next
-      if (next.length === 0) optionsRef.current.onEmpty?.()
-    })
-
-    return () => cleanup?.()
-  }, [])
-
-  return stateRef
+  return cleanup ?? (() => undefined)
 }
 
 export function applyLiveInboxUpdate<T extends ConversationLike>(
