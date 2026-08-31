@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
-import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation } from './profile-store'
+import { createProfile, loadActiveProfileId, loadProfiles, restoreProfileConfiguration, setActiveProfileId, setLastConversation, setProfileHealth } from './profile-store'
 import { openProfileWindow } from './profile-window'
 import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedInbox, loadUnifiedMessageState } from './message-store'
 import { clearDictionary, listDictionary, removeDictionaryEntry, setDictionaryEntry } from './translation-memory-store'
@@ -51,6 +51,7 @@ app.whenReady().then(() => {
   ipcMain.handle('profiles:set-active', (_event, profileId: string) => setActiveProfileId(profileId))
   ipcMain.handle('profiles:create', (_event, input) => createProfile(input))
   ipcMain.handle('profiles:set-last-conversation', (_event, profileId: string, conversationId: string) => setLastConversation(profileId, conversationId))
+  ipcMain.handle('profiles:set-health', (_event, profileId: string, component: 'session' | 'network' | 'messages' | 'translation', status: 'connected' | 'attention' | 'disconnected' | 'not-configured') => setProfileHealth(profileId, component, status))
   ipcMain.handle('profiles:open', async (_event, profileId: string) => {
     const profiles = await loadProfiles()
     const profile = profiles.find((item) => item.id === profileId)
