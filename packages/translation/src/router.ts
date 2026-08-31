@@ -12,7 +12,6 @@ type CacheEntry = {
 }
 
 export type TranslationBatchItem = TranslationRequest & { id?: string }
-
 export type TranslationBatchResult = TranslationResult & { id?: string }
 
 export type TranslationRouterOptions = {
@@ -83,49 +82,52 @@ export class TranslationRouter {
       return [{ ...result, id: items[0].id }]
     }
 
-    const uncached: TranslationBatchItem[] = []
-    const results = new Map<string, TranslationBatchResult>()
+    const uncached: Array<{ item: TranslationBatchItem; index: number }> = []
+    const results = new Array<TranslationBatchResult>(items.length)
 
-    for (const item of items) {
+    items.forEach((item, index) => {
       const cached = this.getCached(this.createCacheKey(item))
       if (cached) {
-        results.set(item.id ?? String(results.size), {
+        results[index] = {
           text: cached.text,
           provider: cached.provider,
           cached: true,
           id: item.id,
-        })
+        }
       } else {
-        uncached.push(item)
+        uncached.push({ item, index })
       }
+    })
+
+    if (uncached.length === 0) return results
+
+    const separator = '\n'
+    const combined = uncached.map(({ item }) => item.text).join(separator)
+    const first = uncached[0].item
+    const batchRequest: TranslationRequest = {
+      ...first,
+      text: combined,
+      context: [...(first.context ?? []), ...uncached.slice(1).map(({ item }) => item.text)],
     }
+    const translated = await this.translate(batchRequest, preferred)
+    const translatedParts = translated.text.split(separator)
 
-    if (uncached.length > 0) {
-      const separator = '\n'
-      const combined = uncached.map((item) => item.text).join(separator)
-      const first = uncached[0]
-      const batchRequest: TranslationRequest = {
-        ...first,
-        text: combined,
-        context: [...(first.context ?? []), ...uncached.slice(1).map((item) => item.text)],
-      }
-      const translated = await this.translate(batchRequest, preferred)
-      const translatedParts = translated.text.split(separator)
-
-      uncached.forEach((item, index) => {
-        results.set(item.id ?? String(index), {
-          text: translatedParts[index] ?? translated.text,
-          provider: translated.provider,
-          cached: translated.cached,
-          id: item.id,
-        })
+    uncached.forEach(({ item, index }, batchIndex) => {
+      const text = translatedParts[batchIndex] ?? translated.text
+      this.cache.set(this.createCacheKey(item), {
+        text,
+        provider: translated.provider,
+        createdAt: Date.now(),
       })
-    }
+      results[index] = {
+        text,
+        provider: translated.provider,
+        cached: translated.cached,
+        id: item.id,
+      }
+    })
 
-    return items.map((item, index) => results.get(item.id ?? String(index))!).map((result) => ({
-      ...result,
-      id: result.id,
-    }))
+    return results
   }
 
   /** Wait for the configured short-message aggregation window. */
