@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, globalShortcut, ipcMain } from 'electron'
 import path from 'node:path'
 import { createProfile, loadActiveProfileId, loadProfiles, setActiveProfileId, setLastConversation } from './profile-store'
 import { openProfileWindow } from './profile-window'
+import { applyProviderSnapshotPersisted, clearPersistedProfileMessages, loadMessagesForProfile, loadUnifiedMessageState } from './message-store'
+import type { ProviderSnapshot } from '../../../../packages/messaging/src/sync'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -83,6 +85,11 @@ app.whenReady().then(() => {
     await writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf8')
     return { canceled: false, filePath: result.filePath }
   })
+
+  ipcMain.handle('messages:load-profile', (_event, profileId: string) => loadMessagesForProfile(profileId))
+  ipcMain.handle('messages:load-unified', () => loadUnifiedMessageState())
+  ipcMain.handle('messages:apply-snapshot', (_event, snapshot: ProviderSnapshot) => applyProviderSnapshotPersisted(snapshot))
+  ipcMain.handle('messages:clear-profile', (_event, profileId: string) => clearPersistedProfileMessages(profileId))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
