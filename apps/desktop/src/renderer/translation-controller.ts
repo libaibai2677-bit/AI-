@@ -10,13 +10,13 @@ export type TranslateMessage = {
 export type TranslationUiState =
   | { status: 'idle' }
   | { status: 'translating'; messageId: string }
-  | { status: 'translated'; messageId: string; cached: boolean; provider: 'deepl' | 'google' | 'memory' }
+  | { status: 'translated'; messageId: string; cached: boolean; provider: 'google' | 'memory' }
   | { status: 'error'; messageId: string; error: string }
 
 export type TranslationActionResult = {
   translatedText: string
   cached: boolean
-  provider: 'deepl' | 'google' | 'memory'
+  provider: 'google' | 'memory'
 }
 
 export function createTranslationStateController() {
